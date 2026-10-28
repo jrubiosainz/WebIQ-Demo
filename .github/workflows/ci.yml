@@ -1,0 +1,25 @@
+# CI del repositorio: tests (datos, lógica y proxy con un upstream simulado) y build.
+# No usa la API real de Web IQ ni secretos.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Demo web · tests y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

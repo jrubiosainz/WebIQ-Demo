@@ -1,0 +1,226 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CLIENTS } from '../data/clients';
+import { SCENARIOS } from '../data/scenarios';
+import { contrastRatio, contrastText, ensureContrast, ensureContrastOn, hexToRgb, mix, surfaceTokens } from './color';
+import { fmtDate, fmtTime, hostOf, shortTrace, clockSeconds, fmtClock } from './format';
+import { fmtInt, monthlyCost, parseRetryAfter, runCost, variantCalls } from './cost';
+import { buildTimeline, citedAt, metricsAt, progress } from './timeline';
+import { parseDeepLink, startView, withDeepLink } from './deeplink';
+import { readStored, writeStored } from './storage';
+import { DEFAULT_SETTINGS, THEME_PRESETS, applyTheme, brandColors, clientAccent, clientName, fontFamily, monoFamily, sanitizeSettings } from './settings';
+import { bingResponsePreview, responsePreview, traceIdFor } from './response';
+import { callLive, fillPreset, getStatus, normalizeResults } from './live';
+import { API_BASE, MCP_URL, bingCurlSnippet, bingTool, curlSnippet, mcpConfig, parseBingConfig, pythonSnippet, snippet, tsSnippet } from './snippets';
+import { highlight } from './highlight';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe('colores y contraste', () => {
+  it('convierte, mezcla y limita colores HEX', () => {
+    expect(hexToRgb('#abc')).toEqual([170, 187, 204]);
+    expect(hexToRgb('not-a-color')).toEqual([128, 128, 128]);
+    expect(mix('#000000', '#ffffff', 0.5)).toBe('#808080');
+    expect(contrastText('#000000')).toBe('#FFFFFF');
+    expect(contrastText('#ffffff')).toBe('#111827');
+  });
+
+  it('mantiene contraste legible en fondos representativos y superficies elevadas', () => {
+    for (const bg of ['#FFFFFF', '#111C30', '#FF8C00', '#00B4FF', '#777777', '#FFD400']) {
+      const s = surfaceTokens(bg);
+      for (const text of [s.text, s.muted, s.faint]) {
+        expect(contrastRatio(text, bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(text, s.raised)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(text, s.hovered)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    expect(contrastRatio(ensureContrast('#777777', '#ffffff'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(ensureContrastOn('#777777', ['#ffffff'], '#000000'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('formato y coste', () => {
+  it('formatea fechas, idiomas, hosts y duraciones', () => {
+    expect(fmtDate('2026-10-28T19:24:00+01:00', 'es')).toBe('28 oct 2026 · 19:24');
+    expect(fmtDate('2026-10-28T00:00:00Z', 'en')).toBe('28 Oct 2026');
+    expect(fmtDate('invalid', 'es')).toBe('invalid');
+    expect(fmtTime('2026-10-28T09:05:00Z')).toBe('09:05');
+    expect(fmtTime('invalid')).toBe('');
+    expect(hostOf('https://www.example.com/a')).toBe('example.com');
+    expect(hostOf('not a url')).toBe('not a url');
+    expect(shortTrace('123456789012345')).toBe('12345678…');
+    expect(clockSeconds('1.02:03:04')).toBe(93_784);
+    expect(fmtClock('0.00:00:48')).toBe('0:48');
+    expect(fmtClock('invalid')).toBe('invalid');
+    expect(fmtInt(1234.6, 'en')).toBe('1,235');
+  });
+
+  it('calcula precios, cobertura y reintentos para los cinco casos', () => {
+    expect(SCENARIOS).toHaveLength(5);
+    for (const scenario of SCENARIOS) {
+      const cost = runCost(scenario);
+      expect(cost.calls).toBe(variantCalls(scenario).length);
+      expect(cost.webiq).toBeGreaterThan(0);
+      expect(cost.bingTx + cost.uncovered).toBe(cost.calls);
+      expect(monthlyCost(scenario, 100, 500).runs).toBe(100);
+    }
+    expect(parseRetryAfter('2s')).toBe(2000);
+    expect(parseRetryAfter('1.5 s')).toBe(1500);
+    expect(parseRetryAfter('soon')).toBe(0);
+  });
+});
+
+describe('reproducción y enlaces profundos', () => {
+  it('genera cronologías y métricas coherentes', () => {
+    for (const scenario of SCENARIOS) {
+      const tl = buildTimeline(scenario, 'webiq');
+      expect(tl.total).toBeGreaterThan(0);
+      expect(tl.steps.length).toBeGreaterThan(0);
+      expect(tl.calls.length).toBe(runCost(scenario).calls);
+      const end = metricsAt(tl, scenario.sources, tl.total);
+      expect(end.calls).toBe(tl.calls.length);
+      expect(end.apiMs).toBeGreaterThan(0);
+      expect(progress(100, 200, 150)).toBe(0.5);
+      expect(progress(100, 100, 100)).toBe(1);
+    }
+    const first = buildTimeline(SCENARIOS[0], 'webiq');
+    expect(citedAt(first, first.total).size).toBeGreaterThan(0);
+  });
+
+  it('valida parámetros de URL y conserva la prioridad de escenario', () => {
+    const link = parseDeepLink('?scenario=2&variant=bing&lang=en&client=barcelo&theme=dark&view=why&settings=open&t=end');
+    expect(link.scenario).toBe(SCENARIOS[1].id);
+    expect(link.variant).toBe('bing');
+    expect(link.seek).toBe('end');
+    expect(link.settingsOpen).toBe(true);
+    expect(startView(link, null)).toEqual({ kind: 'scenario', id: SCENARIOS[1].id });
+    expect(startView(parseDeepLink('?view=guide'), null)).toEqual({ kind: 'guide' });
+    expect(startView(parseDeepLink(''), '{bad')).toEqual({ kind: 'scenario', id: SCENARIOS[0].id });
+    expect(parseDeepLink('?scenario=99&variant=no&lang=xx').scenario).toBeNull();
+  });
+
+  it('aplica cliente e idioma sin mutar ajustes y permite sobreescribir marca con tema', () => {
+    const original = { ...DEFAULT_SETTINGS, colors: { ...DEFAULT_SETTINGS.colors } };
+    const linked = withDeepLink(original, parseDeepLink('?client=barcelo&lang=en&theme=dark'));
+    expect(original.lang).toBe('es');
+    expect(linked.lang).toBe('en');
+    expect(linked.colors).toEqual(THEME_PRESETS.find((p) => p.id === 'dark')?.colors);
+    expect(withDeepLink(original, parseDeepLink(''))).toBe(original);
+    expect(brandColors(original, 'barcelo').accent).toBe(CLIENTS.find((c) => c.id === 'barcelo')?.brand.accent);
+  });
+});
+
+describe('ajustes, persistencia y tema', () => {
+  it('sanea valores importados y resuelve nombre, acento y tipografías', () => {
+    const s = sanitizeSettings({
+      lang: 'en', activeClient: 'barcelo', speed: 9, fontSize: 99, radius: -1,
+      colors: { app: '#123456', panel: 'red' },
+      logos: { barcelo: 'data:image/png;base64,abc', unknown: 'data:image/png;base64,def' },
+      clientNames: { barcelo: '  Cliente  ' }, clientAccents: { barcelo: '#abcdef', custom: 'rgb(0,0,0)' },
+    });
+    expect(s.lang).toBe('en');
+    expect(s.speed).toBe(DEFAULT_SETTINGS.speed);
+    expect(s.fontSize).toBe(18);
+    expect(s.radius).toBe(0);
+    expect(s.colors.app).toBe('#123456');
+    expect(s.colors.panel).toBe(DEFAULT_SETTINGS.colors.panel);
+    expect(s.logos.barcelo).toContain('data:image/');
+    expect(s.logos).not.toHaveProperty('unknown');
+    expect(clientName(s, 'barcelo')).toBe('Cliente');
+    expect(clientAccent(s, 'barcelo')).toBe('#abcdef');
+    expect(fontFamily({ ...s, fontUi: 'custom', fontUiCustom: " Serif' " })).toBe("'Serif', system-ui, sans-serif");
+    expect(monoFamily(s)).toContain('JetBrains Mono');
+  });
+
+  it('persiste ajustes y aplica variables CSS y el idioma al documento', () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    });
+    expect(writeStored('x', 'y')).toBe(true);
+    expect(readStored('x')).toBe('y');
+    const setProperty = vi.fn();
+    const root = { style: { setProperty }, dataset: {} as Record<string, string>, lang: '' };
+    vi.stubGlobal('document', { documentElement: root });
+    applyTheme({ ...DEFAULT_SETTINGS, lang: 'en' });
+    expect(setProperty).toHaveBeenCalledWith('--bg-panel', DEFAULT_SETTINGS.colors.panel);
+    expect(root.lang).toBe('en');
+    expect(root.dataset.scheme).toBe('light');
+  });
+
+  it('degrada con seguridad si localStorage no existe o lanza errores', () => {
+    vi.stubGlobal('localStorage', undefined);
+    expect(readStored('x')).toBeNull();
+    expect(writeStored('x', 'y')).toBe(false);
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
+    expect(readStored('x')).toBeNull();
+    expect(writeStored('x', 'y')).toBe(false);
+  });
+});
+
+describe('respuestas y modo en vivo', () => {
+  it('crea vistas previas deterministas y citas de Bing', () => {
+    const scenario = SCENARIOS[0];
+    const call = variantCalls(scenario)[0];
+    const preview = responsePreview(scenario, call, 'es', 'Dato estructurado');
+    expect(traceIdFor('seed')).toMatch(/^[a-f0-9]{32}$/);
+    expect(traceIdFor('seed')).toBe(traceIdFor('seed'));
+    expect(preview).not.toHaveProperty('domain');
+    if (call.endpoint === 'web') expect(preview).toHaveProperty('webResults');
+    const bing = bingResponsePreview('Resultado [1]', scenario.sources.slice(0, 1));
+    const content = (bing.output as { content: { text: string; annotations: { start_index: number }[] }[] }[])[0].content[0];
+    expect(content.annotations[0].start_index).toBe(10);
+    expect(content.text).toBe('Resultado [1]');
+  });
+
+  it('normaliza evidencias y rellena presets sin alterar la entrada', () => {
+    expect(fillPreset({ q: '{client}', nested: ['{client}'] }, 'Contoso')).toEqual({ q: 'Contoso', nested: ['Contoso'] });
+    expect(normalizeResults('images', { imageResults: [{ url: 'https://cdn.example/img', hostPageUrl: 'https://www.example.com/story', title: 'Imagen' }] })[0])
+      .toMatchObject({ kind: 'image', url: 'https://www.example.com/story', publisher: 'example.com' });
+    expect(normalizeResults('auto', { results: [{ evidence: { type: 'structured/weather', content: { temp: 20 } }, citations: [{ url: 'https://x.test' }] }] })[0].kind).toBe('weather');
+    expect(normalizeResults('browse', { content: 'page text' })).toHaveLength(1);
+    expect(normalizeResults('web', null)).toEqual([]);
+  });
+
+  it('maneja estado y respuestas del proxy local', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, hasKey: true, endpoints: ['web', 'invalid'] }) })
+      .mockResolvedValueOnce({ status: 200, json: async () => ({ status: 201, latencyMs: '12', data: { ok: true } }) }));
+    expect(await getStatus()).toEqual({ ok: true, hasKey: true, endpoints: ['web'] });
+    expect(await callLive('web', { query: 'hello' })).toEqual({ status: 201, latencyMs: 12, data: { ok: true } });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(await getStatus()).toBeNull();
+  });
+});
+
+describe('fragmentos y resaltado de código', () => {
+  it('genera solicitudes curl, Python, TypeScript, MCP y Grounding with Bing', () => {
+    const body = { query: 'clima', maxResults: 3 };
+    expect(curlSnippet('web', body)).toContain(`${API_BASE}/search/web`);
+    expect(pythonSnippet('web', body)).toContain('client.web.search(');
+    expect(tsSnippet('web', body)).toContain('client.web.search(');
+    expect(snippet('curl', 'web', body)).toBe(curlSnippet('web', body));
+    expect(MCP_URL).toBe(`${API_BASE}/mcp`);
+    expect(JSON.parse(mcpConfig()).mcpServers['WebIQ-MCP'].url).toBe(MCP_URL);
+    expect(parseBingConfig('count: 5 · market: es-ES · invalid · blank:')).toEqual({ count: 5, market: 'es-ES' });
+    expect(bingTool('count: 5').type).toBe('bing_grounding');
+    expect(bingCurlSnippet('$HOME $(whoami)', 'count: 5')).toContain('$HOME $(whoami)');
+    expect(bingCurlSnippet('$HOME $(whoami)', 'count: 5')).toContain("'$FOUNDRY_MODEL_DEPLOYMENT_NAME'");
+  });
+
+  it('resalta JSON y comandos sin producir tokens vacíos', () => {
+    const input = '{"a": 1, "b": "x", "c": true}';
+    const tokens = highlight(input, 'json').flat();
+    expect(tokens.filter((t) => t[0] === '').length).toBe(0);
+    expect(tokens).toContainEqual(['"a"', 'k']);
+    expect(tokens).toContainEqual(['1', 'n']);
+    expect(tokens).toContainEqual(['true', 'b']);
+    const bash = highlight("curl --request POST '$HOME'", 'bash').flat();
+    expect(bash).toContainEqual(['curl', 'k']);
+    expect(bash).toContainEqual(['--request', 'p']);
+    expect(bash).toContainEqual(['$HOME', 's']);
+  });
+});
