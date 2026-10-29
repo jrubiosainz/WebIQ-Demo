@@ -4128,6 +4128,27 @@ dl.keys dd {
   margin-left: 0;
 }
 
+/* La barra depende del ancho del panel (barra lateral abierta o cerrada), no de la ventana. */
+.lv-input {
+  container-type: inline-size;
+}
+
+@container (max-width: 900px) {
+  .lv-hint {
+    display: none;
+  }
+
+  .lv-hint + .lv-counter {
+    margin-left: auto;
+  }
+}
+
+@container (max-width: 680px) {
+  .lv-cost {
+    display: none;
+  }
+}
+
 .lv-code {
   display: flex;
   flex-wrap: wrap;
@@ -4971,14 +4992,6 @@ a.lv-moment:hover {
 /* ---------- Adaptación a pantallas ---------- */
 
 @media (max-width: 1360px) {
-  .lv-hint {
-    display: none;
-  }
-
-  .lv-hint + .lv-counter {
-    margin-left: auto;
-  }
-
   .stage-body {
     grid-template-columns: minmax(0, 1fr) 248px;
   }
