@@ -8,3 +8,4 @@ dist/
 !.env.example
 # Análisis interno de clientes: NUNCA subir al repositorio
 privado/
+.copilot-azure/

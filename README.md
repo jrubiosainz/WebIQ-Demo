@@ -45,6 +45,52 @@ npm run live
 
 El proxy escucha por defecto en `127.0.0.1:8787`; Vite reenvía `/api` a ese servidor. La pestaña **En vivo / Live** indica si está disponible. `npm run start` compila y sirve la demo y el proxy desde un único proceso. Para no exponer la clave, no publiques `.env`, no la introduzcas en el navegador y no configures el proxy para escuchar en una red compartida sin revisar antes el acceso.
 
+## Demo en Azure
+
+**URL:** <https://app-webiq-demo-dev-d88a.azurewebsites.net>
+
+La demo se aloja en una **Azure Web App Linux, Node.js 22 LTS**, en **Spain Central**, con un plan **F1 gratuito** propio. Los recursos están en `rg-webiq-demo-dev-d88a`, separados de la demo de Decision-1. F1 tiene arranque en frío, límite diario de CPU y no incluye Always On ni SLA: está pensado para demostraciones ocasionales, no para producción.
+
+Los cinco casos guionizados, el cambio ES/EN y los ajustes de marca funcionan sin clave. **La API en vivo no está habilitada en la web pública.** Antes de añadir `WEBIQ_API_KEY`, protege el acceso al proxy y controla su consumo; ocultar la clave en el servidor no impide que visitantes anónimos generen llamadas de pago.
+
+### Actualizar el código publicado
+
+Compila localmente y sube solo los archivos estáticos y el servidor. No subas `.env`, `node_modules`, fuentes ni archivos internos:
+
+```bash
+npm ci
+npm test
+npm run build
+mkdir -p .copilot-azure
+ZIP=".copilot-azure/webiq-app-$(date -u +%Y%m%dT%H%M%SZ).zip"
+zip -q -r "$ZIP" dist server/index.mjs
+
+az webapp deploy \
+  --subscription 82ed1a19-7945-4aef-88ec-681c7d920d39 \
+  --resource-group rg-webiq-demo-dev-d88a \
+  --name app-webiq-demo-dev-d88a \
+  --src-path "$ZIP" --type zip
+
+curl --fail https://app-webiq-demo-dev-d88a.azurewebsites.net/api/status
+```
+
+La respuesta esperada es `ok: true` y `hasKey: false`. El despliegue usa tu sesión de Azure CLI (Entra), sin habilitar credenciales básicas SCM/FTP.
+
+### Infraestructura reproducible
+
+[`infra/main.bicep`](infra/main.bicep) crea el grupo de recursos y [`infra/app.bicep`](infra/app.bicep) define el plan y la aplicación. La plantilla usa el hostname que Azure asigna para configurar `WEBIQ_ALLOWED_HOSTS`, escucha en `0.0.0.0:8080` y arranca con `node server/index.mjs`. Oryx está desactivado porque el paquete ya está compilado y el servidor solo utiliza módulos nativos de Node.
+
+```bash
+az deployment sub what-if \
+  --subscription 82ed1a19-7945-4aef-88ec-681c7d920d39 \
+  --name webiq-demo-d88a --location spaincentral \
+  --template-file infra/main.bicep \
+  --parameters deployedBy="$(az ad signed-in-user show --query displayName -o tsv)"
+
+# Tras revisar los cambios, repite el comando sustituyendo what-if por create.
+# Después publica el ZIP siguiendo el apartado anterior.
+```
+
 ## Idioma y personalización
 
 - Cambia entre **ES** y **EN** desde la cabecera; la selección se guarda en el navegador.
