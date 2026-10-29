@@ -2,14 +2,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CLIENTS } from '../data/clients';
 import { SCENARIOS } from '../data/scenarios';
 import { contrastRatio, contrastText, ensureContrast, ensureContrastOn, hexToRgb, mix, surfaceTokens } from './color';
-import { fmtDate, fmtTime, hostOf, shortTrace, clockSeconds, fmtClock } from './format';
+import { fmtDate, fmtTime, hostOf, shortTrace, clockSeconds, fmtClock, fmtCompact } from './format';
 import { fmtInt, monthlyCost, parseRetryAfter, runCost, variantCalls } from './cost';
 import { buildTimeline, citedAt, metricsAt, progress } from './timeline';
 import { parseDeepLink, startView, withDeepLink } from './deeplink';
 import { readStored, writeStored } from './storage';
 import { DEFAULT_SETTINGS, THEME_PRESETS, applyTheme, brandColors, clientAccent, clientName, fontFamily, monoFamily, sanitizeSettings } from './settings';
 import { bingResponsePreview, responsePreview, traceIdFor } from './response';
-import { callLive, fillPreset, getStatus, normalizeResults } from './live';
+import {
+  LiveHttpError,
+  applyLiveEvent,
+  askLive,
+  callLive,
+  citedInText,
+  fillPreset,
+  getStatus,
+  lineSplitter,
+  liveRefs,
+  newRun,
+  normalizeResults,
+  safeUrl,
+  verifyAccessCode,
+  type LiveEvent,
+} from './live';
+import { balanceMarks } from '../components/Rich';
 import { API_BASE, MCP_URL, bingCurlSnippet, bingTool, curlSnippet, mcpConfig, parseBingConfig, pythonSnippet, snippet, tsSnippet } from './snippets';
 import { highlight } from './highlight';
 
@@ -97,6 +113,11 @@ describe('reproducción y enlaces profundos', () => {
     expect(link.settingsOpen).toBe(true);
     expect(startView(link, null)).toEqual({ kind: 'scenario', id: SCENARIOS[1].id });
     expect(startView(parseDeepLink('?view=guide'), null)).toEqual({ kind: 'guide' });
+    expect(startView(parseDeepLink('?scenario=0'), null)).toEqual({ kind: 'live' });
+    expect(startView(parseDeepLink('?scenario=live&lang=en'), null)).toEqual({ kind: 'live' });
+    expect(startView(parseDeepLink('?view=live'), null)).toEqual({ kind: 'live' });
+    expect(startView(parseDeepLink(''), JSON.stringify({ kind: 'live' }))).toEqual({ kind: 'live' });
+    expect(startView(parseDeepLink(''), JSON.stringify({ kind: 'nope' }))).toEqual({ kind: 'scenario', id: SCENARIOS[0].id });
     expect(startView(parseDeepLink(''), '{bad')).toEqual({ kind: 'scenario', id: SCENARIOS[0].id });
     expect(parseDeepLink('?scenario=99&variant=no&lang=xx').scenario).toBeNull();
   });
@@ -189,7 +210,7 @@ describe('respuestas y modo en vivo', () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, hasKey: true, endpoints: ['web', 'invalid'] }) })
       .mockResolvedValueOnce({ status: 200, json: async () => ({ status: 201, latencyMs: '12', data: { ok: true } }) }));
-    expect(await getStatus()).toEqual({ ok: true, hasKey: true, endpoints: ['web'] });
+    expect(await getStatus()).toEqual({ ok: true, hasKey: true, auth: null, llm: false, model: null, needsCode: false, endpoints: ['web'] });
     expect(await callLive('web', { query: 'hello' })).toEqual({ status: 201, latencyMs: 12, data: { ok: true } });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await getStatus()).toBeNull();
@@ -222,5 +243,102 @@ describe('fragmentos y resaltado de código', () => {
     expect(bash).toContainEqual(['curl', 'k']);
     expect(bash).toContainEqual(['--request', 'p']);
     expect(bash).toContainEqual(['$HOME', 's']);
+  });
+});
+
+describe('caso 0 · en vivo', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const events: LiveEvent[] = [
+    { type: 'start', sources: ['web', 'videos'], llm: true, model: 'gpt-5.4-mini', auth: 'key' },
+    { type: 'plan', at: 900, planner: 'llm', language: 'es', region: 'ES', queries: { web: 'clásico', videos: 'clásico resumen' }, freshness: 'week' },
+    { type: 'call', at: 910, endpoint: 'videos', request: { query: 'clásico resumen' } },
+    { type: 'call', at: 912, endpoint: 'web', request: { query: 'clásico' } },
+    { type: 'result', at: 1400, endpoint: 'web', status: 200, latencyMs: 488, count: 1, items: [{ title: 'Crónica', url: 'https://as.com/x', ref: 1 }] },
+    { type: 'result', at: 1500, endpoint: 'videos', status: 200, latencyMs: 590, count: 1, items: [{ title: 'Resumen', url: 'https://youtube.com/v', ref: 2 }] },
+    { type: 'answer-start', at: 1510, sources: 2 },
+    { type: 'token', text: 'Ganó el Madrid [1]' },
+    { type: 'token', text: ' y hay vídeo [2].' },
+    { type: 'answer-end', at: 3000, latencyMs: 1490, usage: { prompt: 900, completion: 40 } },
+    { type: 'done', at: 3010, totalMs: 3010, calls: 2, okCalls: 2, costUsd: 0.014, cited: [1, 2], answerMs: 1490, remainingToday: 199 },
+  ];
+
+  it('acumula eventos sin mutar el estado y numera las fuentes citables', () => {
+    const start = newRun('¿Quién ganó?', 'es', ['web', 'news', 'images', 'videos']);
+    const run = events.reduce(applyLiveEvent, start);
+    expect(start.answer).toBe('');
+    expect(start.calls).toEqual({});
+    expect(run.sources).toEqual(['web', 'videos']);
+    expect(run.model).toBe('gpt-5.4-mini');
+    expect(run.plan?.freshness).toBe('week');
+    expect(run.order).toEqual(['videos', 'web']);
+    expect(run.calls.web?.request).toEqual({ query: 'clásico' });
+    expect(run.answer).toBe('Ganó el Madrid [1] y hay vídeo [2].');
+    expect(run.answerState).toBe('done');
+    expect(run.status).toBe('done');
+    expect(run.done?.remainingToday).toBe(199);
+    const refs = liveRefs(run);
+    expect([...refs.keys()].sort()).toEqual([1, 2]);
+    expect(refs.get(2)?.endpoint).toBe('videos');
+    expect(citedInText(run.answer)).toEqual([1, 2]);
+    expect(citedInText('[3] y [1], otra vez [3]')).toEqual([3, 1]);
+  });
+
+  it('distingue errores de la respuesta de errores de la ejecución', () => {
+    const base = newRun('x', 'en', ['web']);
+    const answerErr = applyLiveEvent({ ...base, answerState: 'streaming' }, { type: 'error', stage: 'answer', code: 'LlmError' });
+    expect(answerErr.status).toBe('running');
+    expect(answerErr.answerState).toBe('error');
+    const serverErr = applyLiveEvent({ ...base, answerState: 'done' }, { type: 'error', stage: 'server', code: 'InternalError' });
+    expect(serverErr.status).toBe('error');
+    expect(serverErr.answerState).toBe('done');
+    const skipped = applyLiveEvent(base, { type: 'answer-skipped', at: 10, reason: 'NoSources' });
+    expect(skipped.answerState).toBe('skipped');
+    expect(applyLiveEvent(serverErr, { type: 'done', at: 1, totalMs: 1, calls: 0, okCalls: 0, costUsd: 0, cited: [], remainingToday: null }).status).toBe('error');
+    const resultFirst = applyLiveEvent(base, { type: 'result', at: 5, endpoint: 'news', status: 500, latencyMs: 5, count: 0, items: null as never });
+    expect(resultFirst.order).toEqual(['news']);
+    expect(resultFirst.calls.news?.result?.items).toEqual([]);
+  });
+
+  it('trocea NDJSON en fragmentos arbitrarios y cierra marcas a medias', () => {
+    const split = lineSplitter();
+    expect(split.push('{"a":1}\n{"b"')).toEqual(['{"a":1}']);
+    expect(split.push(':2}\n\n  \n{"c":')).toEqual(['{"b":2}']);
+    expect(split.flush()).toEqual(['{"c":']);
+    expect(split.flush()).toEqual([]);
+    expect(balanceMarks('Hola **mundo')).toBe('Hola **mundo**');
+    expect(balanceMarks('Dato [1')).toBe('Dato');
+    expect(balanceMarks('Dato [')).toBe('Dato');
+    expect(balanceMarks('**ok** [2]')).toBe('**ok** [2]');
+    expect(safeUrl('javascript:alert(1)')).toBeUndefined();
+    expect(safeUrl('https://x.test/a')).toBe('https://x.test/a');
+    expect(fmtCompact(1234567, 'en')).toBe('1.2M');
+  });
+
+  it('lee el flujo, ignora líneas rotas y propaga errores HTTP', async () => {
+    const enc = new TextEncoder();
+    const chunks = ['{"type":"token","text":"Hola"}\n{"type":"tok', 'en","text":" mundo"}\nno-json\n', '{"type":"done","at":5,"totalMs":5,"calls":0,"okCalls":0,"costUsd":0,"cited":[],"remainingToday":3}'];
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        chunks.forEach((x) => c.enqueue(enc.encode(x)));
+        c.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(body, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const got: LiveEvent[] = [];
+    await askLive({ prompt: 'hola', lang: 'es', sources: ['web'] }, (e) => got.push(e));
+    expect(got.map((e) => e.type)).toEqual(['token', 'token', 'done']);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ prompt: 'hola', lang: 'es', sources: ['web'] });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'RateLimited', userMessage: 'slow' }), { status: 429, headers: { 'retry-after': '12' } })));
+    const err = await askLive({ prompt: 'x', lang: 'en', sources: ['web'] }, () => {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LiveHttpError);
+    expect(err).toMatchObject({ status: 429, code: 'RateLimited', retryAfter: 12 });
+    const bad = await verifyAccessCode('nope');
+    expect(bad).toBeInstanceOf(LiveHttpError);
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, remainingToday: 42 }), { status: 200 })));
+    expect(await verifyAccessCode(' code ')).toEqual({ ok: true, remainingToday: 42 });
   });
 });

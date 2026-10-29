@@ -42,6 +42,10 @@ export function hostOf(url: string): string {
   }
 }
 
+/** 1234567 → «1,2 M» / «1.2M». */
+export const fmtCompact = (n: number, lang: Lang): string =>
+  new Intl.NumberFormat(lang === 'es' ? 'es-ES' : 'en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+
 export const shortTrace = (id: string): string => (id.length > 12 ? `${id.slice(0, 8)}…` : id);
 
 /** «0.00:00:48» (d.hh:mm:ss) o «00:07:58» → segundos. NaN si no se reconoce. */

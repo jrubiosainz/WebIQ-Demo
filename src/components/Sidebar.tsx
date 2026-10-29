@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, Info, Sparkles, SquareTerminal } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Info, Radio, Sparkles, SquareTerminal } from 'lucide-react';
 import type { Scenario } from '../data/types';
 import { useI18n } from '../i18n';
 import { PRICES_CHECKED } from '../lib/cost';
@@ -37,6 +37,37 @@ export function Sidebar({ scenarios, view, settings, onSelect, onToggleCollapse 
         </button>
       </div>
       <ol className="scenario-list">
+        <li>
+          <button
+            type="button"
+            className={`scenario-item live-item-nav${view.kind === 'live' ? ' selected' : ''}`}
+            onClick={() => onSelect({ kind: 'live' })}
+            aria-current={view.kind === 'live' ? 'page' : undefined}
+            title={collapsed ? t('case0Nav') : undefined}
+          >
+            <span className="si-icon">
+              <Radio size={18} strokeWidth={1.9} aria-hidden="true" />
+              <span className="si-num">0</span>
+            </span>
+            {!collapsed && (
+              <span className="si-body">
+                <span className="si-title">
+                  {t('case0Nav')}
+                  <span className="si-live">
+                    <i aria-hidden="true" />
+                    {t('liveBadge')}
+                  </span>
+                </span>
+                <span className="si-tagline">{t('case0Tagline')}</span>
+                <span className="si-meta">
+                  {(['web', 'news', 'images', 'videos'] as const).map((e) => (
+                    <EndpointBadge key={e} endpoint={e} small />
+                  ))}
+                </span>
+              </span>
+            )}
+          </button>
+        </li>
         {scenarios.map((s) => {
           const selected = view.kind === 'scenario' && view.id === s.id;
           const recommended = settings.recommendForClient && active !== 'none' && active !== 'custom' && s.primaryClient === active;

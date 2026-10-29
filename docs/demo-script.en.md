@@ -8,6 +8,18 @@
 
 Select the client profile that best fits the audience. In **Settings**, switch language, apply a palette, edit colours, or upload an authorised logo. Keep neutral branding if you do not have permission to use a customer’s visual identity.
 
+## Case 0 · Live (optional, 2–3 minutes)
+
+Use it to open or close with real data, or when the customer asks “does this actually work?”. Enter the access code beforehand so you don’t type it in front of the audience.
+
+1. Click an example: **Latest Clásico**, **Formula 1** or **NBA plays** (sports), **Microsoft AI news**, **iPhone vs Galaxy** or **SpaceX Starship** (tech), **Releases and trailers**, **Valencian paella**, **Lisbon in 2 days** or **Alzheimer’s research** (everything else). You can also take a question from the audience.
+2. While it runs, point to the right-hand panel: the search plan (language, market and freshness chosen by the model) and the four parallel calls with their latency.
+3. When the answer appears, click a `[n]` citation to highlight its source. Scroll to the videos (key moments with timestamps), images and run metrics: total time, calls and cost.
+
+> “This isn’t scripted: it’s the web right now. One request per vertical returns pages with snippet and date, news, images, and videos with their key moments. With generic grounding we would have to chain services to get the same.”
+
+If a search comes back thin, say so: the model only answers from what it finds and flags when sources are insufficient.
+
 ## Five use cases
 
 1. **Regulatory watch.** Let the Web IQ variant play. Point out the official-domain search, Spanish and English press, and full guide read. In the final table, open an obligation and follow its source.  
@@ -27,4 +39,4 @@ For each scenario, switch between **With Web IQ** and **With Grounding with Bing
 
 > “This comparison does not claim that Grounding with Bing Search cannot be extended. It shows where additional tools, chained calls, crawlers, or custom code may be needed. Web IQ offers specialised endpoints to build that workflow with fewer moving parts.”
 
-The on-screen costs are illustrative, based on prices checked on 28 Oct 2026 and configurable volumes; they are not a quote. For a live trial, confirm current prices and terms, configure a server-side key, and use **Live**. Never present scripted data as a customer result or as output from the live API.
+The on-screen costs are illustrative, based on prices checked on 28 Oct 2026 and configurable volumes; they are not a quote. For a live trial, confirm current prices and terms, configure a server-side key, and use **Case 0 · Live**. Never present scripted data as a customer result or as output from the live API.

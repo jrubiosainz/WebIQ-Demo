@@ -98,7 +98,15 @@ describe('servidor local', () => {
   it('informa del estado sin exponer la clave', async () => {
     const on = await call(port, { path: '/api/status' });
     expect(on.status).toBe(200);
-    expect(on.json).toEqual({ ok: true, hasKey: true, endpoints: ['web', 'news', 'images', 'videos', 'browse', 'auto'] });
+    expect(on.json).toEqual({
+      ok: true,
+      hasKey: true,
+      auth: 'key',
+      llm: false,
+      model: null,
+      needsCode: false,
+      endpoints: ['web', 'news', 'images', 'videos', 'browse', 'auto'],
+    });
     expect(on.text).not.toContain(KEY);
     const off = await call(noKeyPort, { path: '/api/status' });
     expect(off.json.hasKey).toBe(false);

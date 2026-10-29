@@ -1,11 +1,13 @@
-// Servidor local de la demo: sirve dist/ y hace de proxy hacia la API de Web IQ.
-// La clave (WEBIQ_API_KEY) se lee de .env y nunca llega al navegador. Sin dependencias.
+// Servidor de la demo: sirve dist/, hace de proxy hacia la API de Web IQ y ejecuta el Caso 0 en vivo.
+// Las credenciales (WEBIQ_API_KEY o Entra ID) se leen del entorno o de .env y nunca llegan al navegador. Sin dependencias.
 import { readFileSync, realpathSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { isIP } from 'node:net';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { llmFromEnv, webiqAuthFromEnv } from './auth.mjs';
+import { createLive } from './live.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -148,32 +150,49 @@ function validate(endpoint, body) {
   return typeof body.query === 'string' && body.query.trim() ? null : '"query" must be a non-empty string.';
 }
 
-async function proxy(req, res, endpoint, opts) {
-  if (req.method !== 'POST') return fail(res, 405, 'MethodNotAllowed', 'Use POST.', { allow: 'POST' });
-  if (!opts.apiKey) {
-    return fail(res, 503, 'MissingApiKey', 'WEBIQ_API_KEY is not set on the demo server. Copy .env.example to .env and restart it.');
-  }
+/** Lee y valida un cuerpo JSON (objeto). Si no es válido responde y devuelve null. */
+async function readJson(req, res) {
   if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
-    return fail(res, 415, 'UnsupportedMediaType', 'Send the body as application/json.');
+    fail(res, 415, 'UnsupportedMediaType', 'Send the body as application/json.');
+    return null;
   }
   const raw = await readBody(req, MAX_BODY);
-  if (raw === null) return fail(res, 413, 'PayloadTooLarge', `The body exceeds ${MAX_BODY / 1024} KB.`, { connection: 'close' });
+  if (raw === null) {
+    fail(res, 413, 'PayloadTooLarge', `The body exceeds ${MAX_BODY / 1024} KB.`, { connection: 'close' });
+    return null;
+  }
   let body;
   try {
     body = JSON.parse(raw);
   } catch {
-    return fail(res, 400, 'InvalidJson', 'The body is not valid JSON.');
+    fail(res, 400, 'InvalidJson', 'The body is not valid JSON.');
+    return null;
   }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return fail(res, 400, 'InvalidJson', 'The body must be a JSON object.');
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    fail(res, 400, 'InvalidJson', 'The body must be a JSON object.');
+    return null;
+  }
+  return body;
+}
+
+async function proxy(req, res, endpoint, opts) {
+  if (req.method !== 'POST') return fail(res, 405, 'MethodNotAllowed', 'Use POST.', { allow: 'POST' });
+  if (!opts.webiq) {
+    return fail(res, 503, 'MissingApiKey', 'WEBIQ_API_KEY is not set on the demo server. Copy .env.example to .env and restart it.');
+  }
+  const body = await readJson(req, res);
+  if (!body) return;
   const invalid = validate(endpoint, body);
   if (invalid) return fail(res, 400, 'InvalidRequest', invalid);
 
   const started = performance.now();
   let upstream;
   try {
-    upstream = await opts.fetch(`${opts.baseUrl}${ENDPOINT_PATHS[endpoint]}`, {
+    const auth = await opts.webiq.headers();
+    const qs = opts.webiq.appId ? `?APPID=${encodeURIComponent(opts.webiq.appId)}` : '';
+    upstream = await opts.fetch(`${opts.baseUrl}${ENDPOINT_PATHS[endpoint]}${qs}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', 'x-apikey': opts.apiKey },
+      headers: { 'content-type': 'application/json', accept: 'application/json', ...auth },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(opts.timeoutMs),
     });
@@ -234,33 +253,71 @@ async function serveStatic(req, res, distDir) {
 }
 
 /**
- * Crea el servidor (sin escuchar). Opciones: apiKey, baseUrl, distDir, timeoutMs,
- * allowedHosts (nombres extra además de localhost e IP) y fetch (para tests).
+ * Crea el servidor (sin escuchar). Opciones:
+ * - apiKey o webiq ({mode, headers(), appId}): credencial de Web IQ.
+ * - llm ({endpoint, model, headers()}): modelo del Caso 0 (opcional).
+ * - live: {accessCode, trustProxy, perMinute, dailyLimit, maxConcurrent, callTimeoutMs, planTimeoutMs, llmTimeoutMs}.
+ * - baseUrl, distDir, timeoutMs, allowedHosts (nombres extra además de localhost e IP), fetch y now (tests).
  */
 export function createApp(options = {}) {
+  const apiKey = (options.apiKey ?? '').trim();
   const opts = {
-    apiKey: (options.apiKey ?? '').trim(),
+    webiq: options.webiq ?? (apiKey ? { mode: 'key', headers: async () => ({ 'x-apikey': apiKey }), appId: null } : null),
     baseUrl: (options.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, ''),
     distDir: options.distDir ?? join(ROOT, 'dist'),
     timeoutMs: options.timeoutMs ?? 30_000,
     allowedHosts: (options.allowedHosts ?? []).map((h) => h.trim().toLowerCase()).filter(Boolean),
     fetch: options.fetch ?? globalThis.fetch,
   };
+  const live = createLive({
+    ...options.live,
+    webiq: opts.webiq,
+    llm: options.llm ?? null,
+    baseUrl: opts.baseUrl,
+    paths: ENDPOINT_PATHS,
+    fetch: opts.fetch,
+    now: options.now,
+    log: options.log,
+  });
   return createServer(async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, opts.allowedHosts)) return fail(res, 403, 'ForbiddenHost', 'Unexpected Host header.');
       const { pathname } = new URL(req.url ?? '/', 'http://x');
       if (pathname === '/api/status') {
         if (req.method !== 'GET') return fail(res, 405, 'MethodNotAllowed', 'Use GET.', { allow: 'GET' });
-        return sendJson(res, 200, { ok: true, hasKey: !!opts.apiKey, endpoints: Object.keys(ENDPOINT_PATHS) });
+        return sendJson(res, 200, {
+          ok: true,
+          hasKey: !!opts.webiq,
+          auth: opts.webiq?.mode ?? null,
+          llm: !!options.llm,
+          model: options.llm?.model ?? null,
+          needsCode: live.needsCode,
+          endpoints: Object.keys(ENDPOINT_PATHS),
+        });
+      }
+      const isApi = pathname.startsWith('/api/');
+      if (isApi && !originAllowed(req.headers.origin, opts.allowedHosts)) {
+        return fail(res, 403, 'ForbiddenOrigin', 'Cross-origin requests are not allowed.');
+      }
+      if (pathname === '/api/live/verify') {
+        if (req.method !== 'GET') return fail(res, 405, 'MethodNotAllowed', 'Use GET.', { allow: 'GET' });
+        if (!live.authorize(req, res, fail)) return;
+        return sendJson(res, 200, { ok: true, remainingToday: live.remainingToday() });
+      }
+      if (pathname === '/api/live/ask') {
+        if (req.method !== 'POST') return fail(res, 405, 'MethodNotAllowed', 'Use POST.', { allow: 'POST' });
+        if (!live.authorize(req, res, fail)) return;
+        const body = await readJson(req, res);
+        if (!body) return;
+        return await live.ask(req, res, body, fail);
       }
       const m = pathname.match(/^\/api\/webiq\/([a-z]+)\/?$/);
       if (m) {
-        if (!originAllowed(req.headers.origin, opts.allowedHosts)) return fail(res, 403, 'ForbiddenOrigin', 'Cross-origin requests are not allowed.');
         if (!Object.hasOwn(ENDPOINT_PATHS, m[1])) return fail(res, 404, 'UnknownEndpoint', `Unknown endpoint "${m[1]}".`);
+        if (!live.authorize(req, res, fail)) return;
         return await proxy(req, res, m[1], opts);
       }
-      if (pathname.startsWith('/api/')) return fail(res, 404, 'NotFound', 'Unknown API route.');
+      if (isApi) return fail(res, 404, 'NotFound', 'Unknown API route.');
       return await serveStatic(req, res, opts.distDir);
     } catch (e) {
       if (!res.headersSent) fail(res, 500, 'InternalError', e instanceof Error ? e.message : 'Unexpected error.');
@@ -282,11 +339,23 @@ if (isMain()) {
   loadEnvFile(join(ROOT, '.env'));
   const port = Number(process.env.PORT) || 8787;
   const host = process.env.HOST || '127.0.0.1';
-  const apiKey = process.env.WEBIQ_API_KEY ?? '';
+  const env = process.env;
+  const webiq = webiqAuthFromEnv(env);
+  const llm = llmFromEnv(env);
+  const int = (v, d) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
   const app = createApp({
-    apiKey,
-    baseUrl: process.env.WEBIQ_BASE_URL,
-    allowedHosts: (process.env.WEBIQ_ALLOWED_HOSTS ?? '').split(','),
+    webiq,
+    llm,
+    baseUrl: env.WEBIQ_BASE_URL,
+    allowedHosts: (env.WEBIQ_ALLOWED_HOSTS ?? '').split(','),
+    live: {
+      accessCode: env.LIVE_ACCESS_CODE,
+      trustProxy: env.TRUST_PROXY === '1' || env.TRUST_PROXY === 'true',
+      perMinute: int(env.LIVE_PER_MINUTE, 6),
+      dailyLimit: int(env.LIVE_DAILY_LIMIT, 200),
+      maxConcurrent: int(env.LIVE_MAX_CONCURRENT, 4),
+    },
+    log: (line) => console.log(line),
   });
   app.on('error', (e) => {
     console.error(`No se pudo arrancar en ${host}:${port}: ${e.message}`);
@@ -294,7 +363,13 @@ if (isMain()) {
   });
   app.listen(port, host, () => {
     console.log(`Microsoft Web IQ · demo en http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
-    console.log(apiKey.trim() ? '  WEBIQ_API_KEY configurada: pestaña «En vivo» activa.' : '  Falta WEBIQ_API_KEY: copia .env.example a .env para la pestaña «En vivo».');
+    console.log(
+      webiq
+        ? `  Web IQ: ${webiq.mode === 'key' ? 'clave (WEBIQ_API_KEY)' : 'Entra ID'} · pestaña «En vivo» y Caso 0 activos.`
+        : '  Falta WEBIQ_API_KEY: copia .env.example a .env para la pestaña «En vivo» y el Caso 0.',
+    );
+    console.log(llm ? `  Caso 0: modelo ${llm.model} en ${new URL(llm.endpoint).host}.` : '  Sin LLM_ENDPOINT: el Caso 0 muestra resultados sin respuesta redactada.');
+    if (env.LIVE_ACCESS_CODE) console.log('  Código de acceso activo (LIVE_ACCESS_CODE).');
     console.log('  Desarrollo: deja este servidor en marcha y usa «npm run dev» (proxy /api).');
   });
   for (const sig of ['SIGINT', 'SIGTERM']) {

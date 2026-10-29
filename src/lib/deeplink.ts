@@ -3,12 +3,16 @@ import { SCENARIOS } from '../data/scenarios';
 import type { BrandId, Lang, Variant } from '../data/types';
 import { brandColors, THEME_PRESETS, type Settings } from './settings';
 
-/** Vista principal: un caso, «Por qué Web IQ» o la guía de la demo. */
-export type View = { kind: 'scenario'; id: string } | { kind: 'why' } | { kind: 'guide' };
+/** Vista principal: un caso, el caso 0 en vivo, «Por qué Web IQ» o la guía de la demo. */
+export type View = { kind: 'scenario'; id: string } | { kind: 'live' } | { kind: 'why' } | { kind: 'guide' };
+type PageKind = 'live' | 'why' | 'guide';
+const PAGES: PageKind[] = ['live', 'why', 'guide'];
+const isPage = (v: unknown): v is PageKind => PAGES.includes(v as PageKind);
 
 /**
  * Enlace profundo ya validado. Ejemplo:
  * ?scenario=2&variant=bing&tab=cost&t=end&lang=en&client=barcelo&theme=dark&view=why&settings=open
+ * El caso 0 (consulta en vivo) se abre con ?scenario=0 o ?view=live.
  * Lo que no se reconoce se ignora (null) y la demo arranca con lo guardado.
  */
 export interface DeepLink {
@@ -21,7 +25,7 @@ export interface DeepLink {
   lang: Lang | null;
   client: BrandId | 'none' | null;
   theme: string | null;
-  view: 'why' | 'guide' | null;
+  view: PageKind | null;
   settingsOpen: boolean;
 }
 
@@ -38,17 +42,18 @@ export function parseDeepLink(search: string): DeepLink {
   const variant = p.get('variant');
   const lang = p.get('lang');
   const client = p.get('client');
-  const view = p.get('view');
+  const scenario = p.get('scenario');
+  const view = scenario === '0' || scenario === 'live' ? 'live' : p.get('view');
   const theme = p.get('theme');
   return {
-    scenario: scenarioFrom(p.get('scenario')),
+    scenario: scenarioFrom(scenario),
     variant: variant === 'webiq' || variant === 'bing' ? variant : null,
     tab: p.get('tab'),
     seek: t === 'end' ? 'end' : t && Number.isFinite(Number(t)) ? Number(t) : undefined,
     lang: lang === 'es' || lang === 'en' ? lang : null,
     client: client === 'none' || CLIENTS.some((c) => c.id === client) ? (client as BrandId | 'none') : null,
     theme: THEME_PRESETS.some((x) => x.id === theme) ? theme : null,
-    view: view === 'why' || view === 'guide' ? view : null,
+    view: isPage(view) ? view : null,
     settingsOpen: p.get('settings') === 'open',
   };
 }
@@ -70,7 +75,8 @@ export function startView(link: DeepLink, saved: string | null): View {
   if (link.view) return { kind: link.view };
   try {
     const v = JSON.parse(saved ?? 'null') as View | null;
-    if (v?.kind === 'why' || v?.kind === 'guide') return { kind: v.kind };
+    const kind = v?.kind;
+    if (isPage(kind)) return { kind };
     if (v?.kind === 'scenario' && SCENARIOS.some((s) => s.id === v.id)) return { kind: 'scenario', id: v.id };
   } catch {
     /* vista guardada ilegible */

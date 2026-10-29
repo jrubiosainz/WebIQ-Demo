@@ -8,6 +8,18 @@
 
 Selecciona el cliente que mejor encaje con la audiencia. En **Ajustes** puedes cambiar el idioma, aplicar una paleta, editar colores o subir un logo autorizado. Mantén activada la marca neutral si no tienes permiso para usar la identidad visual del cliente.
 
+## Caso 0 · En vivo (opcional, 2–3 minutos)
+
+Úsalo para abrir o cerrar con datos reales, o cuando el cliente pregunte «¿y esto funciona de verdad?». Introduce antes el código de acceso para no hacerlo delante del público.
+
+1. Pulsa un ejemplo: **Último Clásico**, **Fórmula 1** o **Jugadas NBA** (deportes), **Novedades de Microsoft IA**, **iPhone vs Galaxy** o **Starship de SpaceX** (tecnología), **Estrenos y tráilers**, **Paella valenciana**, **Lisboa en 2 días** o **Avances en alzhéimer** (temas varios). También puedes pedir al público una pregunta.
+2. Mientras se ejecuta, señala el panel derecho: el plan de búsqueda (idioma, mercado y frescura elegidos por el modelo) y las cuatro llamadas en paralelo con su latencia.
+3. Cuando aparezca la respuesta, pulsa una cita `[n]` para resaltar su fuente. Baja hasta los vídeos (momentos clave con marca de tiempo), las imágenes y las métricas: tiempo total, llamadas y coste.
+
+> «Esto no está guionizado: es la web de ahora mismo. Una sola petición por vertical nos da páginas con su fragmento y fecha, noticias, imágenes y vídeos con sus momentos clave. Con un grounding genérico tendríamos que encadenar servicios para conseguir lo mismo.»
+
+Si una búsqueda devuelve poco, dilo con naturalidad: el modelo solo responde con lo que encuentra y lo indica cuando las fuentes no bastan.
+
 ## Recorrido por los cinco casos
 
 1. **Vigilancia regulatoria.** Abre el caso y deja avanzar la variante Web IQ. Señala la búsqueda restringida al dominio oficial, la prensa en español e inglés y la lectura completa de la guía. En la tabla final, abre una obligación y sigue su fuente.  
@@ -27,4 +39,4 @@ En cada caso alterna **Con Web IQ** y **Con Grounding with Bing**. En las pesta�
 
 > «La comparación no dice que Grounding with Bing Search no se pueda ampliar. Muestra qué partes pueden exigir herramientas adicionales, llamadas encadenadas, crawlers o código a medida. Web IQ ofrece endpoints especializados para construir ese flujo con menos piezas.»
 
-El coste de la pantalla es ilustrativo, basado en precios consultados el 28-10-2026 y en volúmenes configurables; no es una cotización. Para una prueba real, revisa precios y términos vigentes, configura una clave en el servidor y usa el modo **En vivo**. No presentes los datos guionizados como resultados de un cliente o de la API real.
+El coste de la pantalla es ilustrativo, basado en precios consultados el 28-10-2026 y en volúmenes configurables; no es una cotización. Para una prueba real, revisa precios y términos vigentes, configura una clave en el servidor y usa el **Caso 0 · En vivo**. No presentes los datos guionizados como resultados de un cliente o de la API real.

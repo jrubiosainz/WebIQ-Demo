@@ -3,6 +3,7 @@ import { AgentStage } from './components/AgentStage';
 import { BottomPanel, TAB_IDS, type SourceFocus, type TabId } from './components/BottomPanel';
 import { GuideView } from './components/GuideView';
 import { Header } from './components/Header';
+import { LiveView } from './components/LiveView';
 import { ScenarioHeader } from './components/ScenarioHeader';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { Sidebar } from './components/Sidebar';
@@ -83,6 +84,7 @@ export default function App() {
       } else if (k === 'r' && inScenario) pb.restart();
       else if (e.key === 'ArrowRight' && inScenario) pb.skip();
       else if (k === 'v' && inScenario) setVariant(variant === 'webiq' ? 'bing' : 'webiq');
+      else if (e.key === '0') setView({ kind: 'live' });
       else if (/^[1-5]$/.test(e.key) && SCENARIOS[Number(e.key) - 1]) setView({ kind: 'scenario', id: SCENARIOS[Number(e.key) - 1].id });
       else if (k === 'l') setLang(settings.lang === 'es' ? 'en' : 'es');
       else if (k === 's') setSettingsOpen(true);
@@ -106,6 +108,7 @@ export default function App() {
           <main className="main">
             {view.kind === 'why' && <WhyView scenarios={SCENARIOS} settings={settings} onOpen={(id) => setView({ kind: 'scenario', id })} />}
             {view.kind === 'guide' && <GuideView />}
+            {view.kind === 'live' && <LiveView settings={settings} />}
             {view.kind === 'scenario' && (
               <>
                 <ScenarioHeader

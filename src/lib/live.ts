@@ -1,10 +1,18 @@
-import type { Endpoint, SourceKind } from '../data/types';
+import type { Endpoint, Lang, SourceKind } from '../data/types';
 import { ENDPOINTS } from '../data/types';
 import { hostOf } from './format';
+import { readStored, writeStored } from './storage';
 
 export interface LiveStatus {
   ok: boolean;
   hasKey: boolean;
+  /** Cómo se autentica el servidor ante Web IQ: clave o token de Entra. */
+  auth: 'key' | 'entra' | null;
+  /** Hay modelo para planificar y redactar la respuesta del caso 0. */
+  llm: boolean;
+  model: string | null;
+  /** El servidor pide código de acceso (demo publicada). */
+  needsCode: boolean;
   endpoints: Endpoint[];
 }
 
@@ -23,7 +31,15 @@ export async function getStatus(timeoutMs = 2500): Promise<LiveStatus | null> {
     if (!res.ok) return null;
     const j = (await res.json()) as Partial<LiveStatus>;
     if (j.ok !== true) return null;
-    return { ok: true, hasKey: !!j.hasKey, endpoints: (j.endpoints ?? []).filter((e): e is Endpoint => ENDPOINTS.includes(e as Endpoint)) };
+    return {
+      ok: true,
+      hasKey: !!j.hasKey,
+      auth: j.auth === 'key' || j.auth === 'entra' ? j.auth : null,
+      llm: !!j.llm,
+      model: typeof j.model === 'string' && j.model ? j.model : null,
+      needsCode: !!j.needsCode,
+      endpoints: (j.endpoints ?? []).filter((e): e is Endpoint => ENDPOINTS.includes(e as Endpoint)),
+    };
   } catch {
     return null;
   } finally {
@@ -34,7 +50,7 @@ export async function getStatus(timeoutMs = 2500): Promise<LiveStatus | null> {
 export async function callLive(endpoint: Endpoint, body: unknown): Promise<LiveResponse> {
   const res = await fetch(`/api/webiq/${endpoint}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    headers: { 'content-type': 'application/json', accept: 'application/json', ...codeHeader() },
     body: JSON.stringify(body),
   });
   let j: unknown = null;
@@ -134,4 +150,296 @@ export function normalizeResults(endpoint: Endpoint, data: unknown): LiveItem[] 
         return item(kind, cite, { content, extra: type });
       });
   }
+}
+
+/* ============================================================
+   Caso 0 · consulta libre en vivo (POST /api/live/ask, NDJSON)
+   ============================================================ */
+
+export type LiveSource = 'web' | 'news' | 'images' | 'videos';
+export type LiveEndpoint = LiveSource | 'browse';
+export const LIVE_SOURCES: LiveSource[] = ['web', 'news', 'images', 'videos'];
+export const LIVE_MAX_PROMPT = 500;
+
+const CODE_KEY = 'webiq-demo-live-code';
+export const getAccessCode = (): string => readStored(CODE_KEY) ?? '';
+export const setAccessCode = (code: string): boolean => writeStored(CODE_KEY, code.trim());
+function codeHeader(): Record<string, string> {
+  const c = getAccessCode();
+  return c ? { 'x-demo-code': c } : {};
+}
+
+/** Los resultados vienen de la web: solo se enlazan o se pintan URL http(s). */
+export const safeUrl = (u: string | undefined): string | undefined => (u && /^https?:\/\//i.test(u) ? u : undefined);
+
+export interface LiveTextItem {
+  title: string;
+  url: string;
+  snippet?: string;
+  date?: string;
+  /** Número [n] con el que la respuesta puede citarla. */
+  ref?: number;
+  /** news: medio. */
+  source?: string;
+  thumbnailUrl?: string;
+}
+
+export interface LiveImageItem {
+  title: string;
+  url: string;
+  hostPageUrl?: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface LiveMoment {
+  title: string;
+  startTime?: string;
+  momentUrl?: string;
+}
+
+export interface LiveVideoItem extends LiveTextItem {
+  publishedBy?: string;
+  viewCount?: number;
+  length?: string;
+  embeddingUrl?: string;
+  moments?: LiveMoment[];
+  bestMomentIndex?: number;
+}
+
+export type LiveAnyItem = LiveTextItem | LiveImageItem | LiveVideoItem;
+
+export interface LivePlan {
+  at: number;
+  planner: 'llm' | 'fallback';
+  language: string;
+  region: string;
+  queries: Partial<Record<LiveSource, string>>;
+  freshness?: string;
+  browse?: string;
+  error?: string;
+}
+
+export interface LiveCall {
+  endpoint: LiveEndpoint;
+  at: number;
+  request: Record<string, unknown>;
+  result?: {
+    at: number;
+    status: number;
+    latencyMs: number;
+    traceId?: string;
+    count: number;
+    items: LiveAnyItem[];
+    error?: { code: string; message?: string };
+  };
+}
+
+export interface LiveDone {
+  totalMs: number;
+  calls: number;
+  okCalls: number;
+  costUsd: number;
+  cited: number[];
+  answerMs?: number;
+  remainingToday: number | null;
+}
+
+export type LiveEvent =
+  | { type: 'start'; sources: LiveSource[]; llm: boolean; model: string | null; auth: string | null }
+  | ({ type: 'plan' } & LivePlan)
+  | { type: 'call'; at: number; endpoint: LiveEndpoint; request: Record<string, unknown> }
+  | ({ type: 'result'; endpoint: LiveEndpoint } & NonNullable<LiveCall['result']>)
+  | { type: 'answer-start'; at: number; sources: number }
+  | { type: 'token'; text: string }
+  | { type: 'answer-end'; at: number; latencyMs: number; usage?: { prompt?: number; completion?: number } }
+  | { type: 'answer-skipped'; at: number; reason: 'NoSources' | 'AllCallsFailed' | 'NoLlm' }
+  | { type: 'error'; at?: number; stage: string; code: string; message?: string }
+  | ({ type: 'done'; at: number } & LiveDone);
+
+export type AnswerState = 'waiting' | 'streaming' | 'done' | 'skipped' | 'error';
+
+export interface LiveRun {
+  prompt: string;
+  lang: Lang;
+  sources: LiveSource[];
+  status: 'running' | 'done' | 'error' | 'aborted';
+  model: string | null;
+  plan?: LivePlan;
+  calls: Partial<Record<LiveEndpoint, LiveCall>>;
+  /** Orden de llegada de las llamadas (para pintar la línea de tiempo). */
+  order: LiveEndpoint[];
+  answer: string;
+  answerState: AnswerState;
+  answerAt?: number;
+  answerMs?: number;
+  usage?: { prompt?: number; completion?: number };
+  skipReason?: string;
+  error?: { stage: string; code: string; message?: string };
+  done?: LiveDone;
+}
+
+export const newRun = (prompt: string, lang: Lang, sources: LiveSource[]): LiveRun => ({
+  prompt,
+  lang,
+  sources,
+  status: 'running',
+  model: null,
+  calls: {},
+  order: [],
+  answer: '',
+  answerState: 'waiting',
+});
+
+/** Aplica un evento NDJSON al estado de la ejecución (puro: devuelve un objeto nuevo). */
+export function applyLiveEvent(run: LiveRun, ev: LiveEvent): LiveRun {
+  switch (ev.type) {
+    case 'start':
+      return { ...run, model: ev.model, sources: ev.sources };
+    case 'plan': {
+      const { type: _t, ...plan } = ev;
+      return { ...run, plan };
+    }
+    case 'call':
+      return {
+        ...run,
+        calls: { ...run.calls, [ev.endpoint]: { endpoint: ev.endpoint, at: ev.at, request: ev.request } },
+        order: run.order.includes(ev.endpoint) ? run.order : [...run.order, ev.endpoint],
+      };
+    case 'result': {
+      const { type: _t, endpoint, ...result } = ev;
+      const prev = run.calls[endpoint] ?? { endpoint, at: result.at, request: {} };
+      return {
+        ...run,
+        calls: { ...run.calls, [endpoint]: { ...prev, result: { ...result, items: Array.isArray(result.items) ? result.items : [] } } },
+        order: run.order.includes(endpoint) ? run.order : [...run.order, endpoint],
+      };
+    }
+    case 'answer-start':
+      return { ...run, answerState: 'streaming', answerAt: ev.at };
+    case 'token':
+      return { ...run, answerState: 'streaming', answer: run.answer + (ev.text ?? '') };
+    case 'answer-end':
+      return { ...run, answerState: 'done', answerMs: ev.latencyMs, usage: ev.usage };
+    case 'answer-skipped':
+      return { ...run, answerState: 'skipped', skipReason: ev.reason };
+    case 'error':
+      return {
+        ...run,
+        error: { stage: ev.stage, code: ev.code, message: ev.message },
+        answerState: ev.stage === 'answer' || run.answerState === 'waiting' ? 'error' : run.answerState,
+        status: ev.stage === 'answer' ? run.status : 'error',
+      };
+    case 'done': {
+      const { type: _t, at: _a, ...done } = ev;
+      return { ...run, status: run.status === 'running' ? 'done' : run.status, done };
+    }
+    default:
+      return run;
+  }
+}
+
+/** Fuentes citables [n] → elemento y endpoint de origen. */
+export function liveRefs(run: Pick<LiveRun, 'calls' | 'order'>): Map<number, { endpoint: LiveEndpoint; item: LiveTextItem }> {
+  const out = new Map<number, { endpoint: LiveEndpoint; item: LiveTextItem }>();
+  for (const e of run.order) {
+    for (const it of run.calls[e]?.result?.items ?? []) {
+      const ref = (it as LiveTextItem).ref;
+      if (typeof ref === 'number') out.set(ref, { endpoint: e, item: it as LiveTextItem });
+    }
+  }
+  return out;
+}
+
+/** Números [n] que aparecen en la respuesta, en orden de primera aparición. */
+export function citedInText(text: string): number[] {
+  const seen: number[] = [];
+  for (const m of text.matchAll(/\[(\d+)\]/g)) {
+    const n = Number(m[1]);
+    if (!seen.includes(n)) seen.push(n);
+  }
+  return seen;
+}
+
+/** Trocea un flujo NDJSON que llega en pedazos arbitrarios. */
+export function lineSplitter() {
+  let buf = '';
+  return {
+    push(chunk: string): string[] {
+      buf += chunk;
+      const parts = buf.split('\n');
+      buf = parts.pop() ?? '';
+      return parts.map((l) => l.trim()).filter(Boolean);
+    },
+    flush(): string[] {
+      const rest = buf.trim();
+      buf = '';
+      return rest ? [rest] : [];
+    },
+  };
+}
+
+export class LiveHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly retryAfter?: number,
+  ) {
+    super(message);
+    this.name = 'LiveHttpError';
+  }
+}
+
+async function httpError(res: Response): Promise<LiveHttpError> {
+  let j: { errorCode?: string; userMessage?: string } = {};
+  try {
+    j = (await res.json()) as typeof j;
+  } catch {
+    /* sin JSON */
+  }
+  const ra = Number(res.headers.get('retry-after'));
+  return new LiveHttpError(res.status, j.errorCode ?? `HTTP ${res.status}`, j.userMessage ?? res.statusText, Number.isFinite(ra) && ra > 0 ? ra : undefined);
+}
+
+/** Comprueba un código de acceso sin gastar consultas. */
+export async function verifyAccessCode(code: string): Promise<{ ok: true; remainingToday: number | null } | LiveHttpError> {
+  const res = await fetch('/api/live/verify', { headers: { accept: 'application/json', 'x-demo-code': code.trim() } });
+  if (!res.ok) return httpError(res);
+  const j = (await res.json()) as { remainingToday?: number | null };
+  return { ok: true, remainingToday: typeof j.remainingToday === 'number' ? j.remainingToday : null };
+}
+
+/** Lanza la consulta y entrega cada evento según llega. Lanza LiveHttpError si el servidor la rechaza. */
+export async function askLive(
+  input: { prompt: string; lang: Lang; sources: LiveSource[] },
+  onEvent: (ev: LiveEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch('/api/live/ask', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/x-ndjson', ...codeHeader() },
+    body: JSON.stringify(input),
+    signal,
+  });
+  if (!res.ok) throw await httpError(res);
+  if (!res.body) throw new LiveHttpError(502, 'NoStream', 'The server returned no stream.');
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  const split = lineSplitter();
+  const emit = (line: string) => {
+    let ev: LiveEvent;
+    try {
+      ev = JSON.parse(line) as LiveEvent;
+    } catch {
+      return; // línea ilegible: se ignora
+    }
+    onEvent(ev);
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    split.push(value).forEach(emit);
+  }
+  split.flush().forEach(emit);
 }

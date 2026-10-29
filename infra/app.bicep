@@ -2,6 +2,12 @@ param location string
 param appServiceName string
 param appServicePlanName string
 param tags object
+param llmEndpoint string = ''
+param llmModel string = 'gpt-5.4-mini'
+@secure()
+param liveAccessCode string = ''
+@secure()
+param webiqApiKey string = ''
 
 resource plan 'Microsoft.Web/serverfarms@2026-08-01' = {
   name: appServicePlanName
@@ -22,6 +28,10 @@ resource app 'Microsoft.Web/sites@2026-08-01' = {
   location: location
   tags: tags
   kind: 'app,linux'
+  // Identidad para pedir tokens de Entra al modelo del Caso 0 (rol Cognitive Services OpenAI User).
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: plan.id
     httpsOnly: true
@@ -44,7 +54,8 @@ resource app 'Microsoft.Web/sites@2026-08-01' = {
 resource settings 'Microsoft.Web/sites/config@2026-08-01' = {
   parent: app
   name: 'appsettings'
-  properties: {
+  // Este recurso reemplaza TODOS los ajustes: pasa liveAccessCode y webiqApiKey en cada despliegue o se eliminarán.
+  properties: union({
     HOST: '0.0.0.0'
     PORT: '8080'
     NODE_ENV: 'production'
@@ -54,7 +65,12 @@ resource settings 'Microsoft.Web/sites/config@2026-08-01' = {
     ENABLE_ORYX_BUILD: 'false'
     WEBSITE_WARMUP_PATH: '/api/status'
     WEBSITE_WARMUP_STATUSES: '200'
-  }
+    // Front ends de App Service: la IP del visitante llega en X-Forwarded-For (límites por IP del Caso 0).
+    TRUST_PROXY: '1'
+  },
+  empty(llmEndpoint) ? {} : { LLM_ENDPOINT: llmEndpoint, LLM_MODEL: llmModel },
+  empty(liveAccessCode) ? {} : { LIVE_ACCESS_CODE: liveAccessCode },
+  empty(webiqApiKey) ? {} : { WEBIQ_API_KEY: webiqApiKey })
 }
 
 resource scmAuth 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2026-08-01' = {
@@ -76,3 +92,4 @@ resource ftpAuth 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2026-08
 output appServiceId string = app.id
 output appServicePlanId string = plan.id
 output appUrl string = 'https://${app.properties.defaultHostName}'
+output principalId string = app.identity.principalId

@@ -28,6 +28,13 @@ npm start                 # http://127.0.0.1:8787`;
 const RUN_DEV = `npm run dev               # Vite · http://localhost:5173
 npm run live              # otra terminal · another terminal`;
 
+const RUN_CASE0 = `# .env · Caso 0 (en vivo / live)
+WEBIQ_API_KEY=<your-api-key>
+LLM_ENDPOINT=https://<foundry-resource>.cognitiveservices.azure.com/openai/v1
+LLM_MODEL=gpt-5.4-mini            # Entra ID (az login / managed identity) o LLM_API_KEY
+LIVE_ACCESS_CODE=<code>           # recomendado si la web es pública · recommended if public
+LIVE_PER_MINUTE=6  LIVE_DAILY_LIMIT=200  LIVE_MAX_CONCURRENT=4`;
+
 const MCP_CLI = JSON.stringify(
   {
     mcpServers: {
@@ -41,7 +48,7 @@ const MCP_CLI = JSON.stringify(
 const SDKS = `pip install webiq                # Python 3.11+
 npm install @microsoft/webiq     # Node.js 22+`;
 
-type Step = { title: string; body: string; code: string; lang: 'bash' | 'json'; extra?: { code: string; lang: 'bash' | 'json'; title: string } };
+type Step = { title: string; body: string; code: string; lang: 'bash' | 'json'; file?: string; extra?: { code: string; lang: 'bash' | 'json'; title: string } };
 
 export function GuideView() {
   const { lang } = useI18n();
@@ -67,11 +74,20 @@ export function GuideView() {
     {
       title: es ? 'Arranca la demo con la API en vivo' : 'Start the demo with the live API',
       body: es
-        ? 'La clave se queda en el servidor local (server/index.mjs): el navegador nunca la ve. Sin clave, la demo funciona igual y solo la pestaña «En vivo» queda desactivada. Necesitas Node.js 22 o superior.'
-        : 'The key stays on the local server (server/index.mjs): the browser never sees it. Without a key the demo works the same, and only the “Live” tab is disabled. You need Node.js 22 or later.',
+        ? 'La clave se queda en el servidor local (server/index.mjs): el navegador nunca la ve. Sin clave, la demo funciona igual y solo el Caso 0 y la pestaña «En vivo» quedan desactivados. Necesitas Node.js 22 o superior.'
+        : 'The key stays on the local server (server/index.mjs): the browser never sees it. Without a key the demo works the same, and only Case 0 and the “Live” tab are disabled. You need Node.js 22 or later.',
       code: RUN_DEMO,
       lang: 'bash',
       extra: { code: RUN_DEV, lang: 'bash', title: es ? 'Modo desarrollo' : 'Development mode' },
+    },
+    {
+      title: es ? 'Activa el Caso 0: preguntas libres en tiempo real' : 'Enable Case 0: free-form questions in real time',
+      body: es
+        ? 'El Caso 0 deja escribir cualquier pregunta. Un modelo de Foundry planifica las búsquedas, Web IQ consulta web, noticias, imágenes y vídeos en paralelo y la respuesta llega en streaming con citas numeradas. Sin LLM_ENDPOINT, el Caso 0 muestra igualmente los resultados de Web IQ, pero sin respuesta redactada. Si publicas la demo, define LIVE_ACCESS_CODE: cada pregunta consume llamadas reales.'
+        : 'Case 0 lets you type any question. A Foundry model plans the searches, Web IQ queries web, news, images and videos in parallel, and the answer streams in with numbered citations. Without LLM_ENDPOINT, Case 0 still shows the Web IQ results but no written answer. If you publish the demo, set LIVE_ACCESS_CODE: every question uses real calls.',
+      code: RUN_CASE0,
+      lang: 'bash',
+      file: '.env',
     },
     {
       title: es ? 'Úsalo desde agentes con MCP' : 'Use it from agents over MCP',
@@ -92,14 +108,14 @@ export function GuideView() {
   ];
 
   const params: [string, string, string][] = [
-    ['scenario', es ? '1–5 o id del caso' : '1–5 or case id', es ? 'Abre un caso' : 'Opens a case'],
+    ['scenario', es ? '0–5 o id del caso' : '0–5 or case id', es ? 'Abre un caso (0 = en vivo)' : 'Opens a case (0 = live)'],
     ['variant', 'webiq · bing', es ? 'Con Web IQ o con Grounding with Bing' : 'With Web IQ or with Grounding with Bing'],
     ['tab', 'evidence · compare · cost · api · live', es ? 'Pestaña inicial del panel inferior' : 'Initial tab of the bottom panel'],
     ['t', es ? 'ms o end' : 'ms or end', es ? 'Empieza en ese momento (end = resultado final)' : 'Starts at that moment (end = final result)'],
     ['lang', 'es · en', es ? 'Idioma' : 'Language'],
     ['client', 'iberdrola · barcelo · w2m · segurcaixa · cam · custom · none', es ? 'Cliente activo (logo, colores y recomendación)' : 'Active client (logo, colours and recommendation)'],
     ['theme', 'light · soft · dark', es ? 'Tema base' : 'Base theme'],
-    ['view', 'why · guide', es ? 'Abre «Por qué Web IQ» o esta guía' : 'Opens “Why Web IQ” or this guide'],
+    ['view', 'live · why · guide', es ? 'Abre el Caso 0, «Por qué Web IQ» o esta guía' : 'Opens Case 0, “Why Web IQ” or this guide'],
     ['settings', 'open', es ? 'Abre los ajustes' : 'Opens settings'],
   ];
 
@@ -108,6 +124,7 @@ export function GuideView() {
     ['R', es ? 'Reiniciar' : 'Restart'],
     ['→', es ? 'Saltar al resultado' : 'Skip to the result'],
     ['V', es ? 'Cambiar entre Web IQ y Grounding with Bing' : 'Switch between Web IQ and Grounding with Bing'],
+    ['0', es ? 'Caso 0 · en vivo' : 'Case 0 · live'],
     ['1–5', es ? 'Ir a un caso' : 'Go to a case'],
     ['L', es ? 'Cambiar idioma' : 'Switch language'],
     ['S', es ? 'Abrir ajustes' : 'Open settings'],
@@ -119,8 +136,8 @@ export function GuideView() {
         <h1>{es ? 'Cómo probar Web IQ y presentar la demo' : 'How to try Web IQ and present the demo'}</h1>
         <p className="lede">
           {es
-            ? 'Los cinco casos son reproducciones guionizadas con datos ficticios, para que la demo funcione siempre y sin coste. La pestaña «En vivo» llama a la API real de Web IQ con tu clave a través de un pequeño servidor local.'
-            : 'The five cases are scripted replays with fictitious data, so the demo always works at no cost. The “Live” tab calls the real Web IQ API with your key through a small local server.'}
+            ? 'Los casos 1 a 5 son reproducciones guionizadas con datos ficticios, para que la demo funcione siempre y sin coste. El Caso 0 y la pestaña «En vivo» llaman a la API real de Web IQ con tu clave a través de un pequeño servidor.'
+            : 'Cases 1 to 5 are scripted replays with fictitious data, so the demo always works at no cost. Case 0 and the “Live” tab call the real Web IQ API with your key through a small server.'}
         </p>
       </header>
 
@@ -129,7 +146,7 @@ export function GuideView() {
           <li key={i}>
             <h2>{s.title}</h2>
             <p>{s.body}</p>
-            <CodeBlock code={s.code} lang={s.lang} title={s.lang === 'json' ? 'mcp-config.json' : 'shell'} />
+            <CodeBlock code={s.code} lang={s.lang} title={s.file ?? (s.lang === 'json' ? 'mcp-config.json' : 'shell')} />
             {s.extra && <CodeBlock code={s.extra.code} lang={s.extra.lang} title={s.extra.title} />}
             {i === 1 && (
               <p>

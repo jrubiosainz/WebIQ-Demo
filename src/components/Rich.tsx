@@ -30,14 +30,18 @@ function inline(text: string, key: string, onCite?: CiteHandler): ReactNode[] {
   });
 }
 
-/** Prefijo «tecleado» de un texto sin dejar marcas a medias (`**` abierto o `[n` incompleto). */
-export function typedPrefix(text: string, n: number): string {
-  if (n >= text.length) return text;
-  let s = text.slice(0, Math.max(0, Math.floor(n)));
-  s = s.replace(/\s*\[\d*$/, '');
+/** Cierra las marcas a medias de un texto incompleto (`**` abierto o `[n` sin cerrar). */
+export function balanceMarks(text: string): string {
+  let s = text.replace(/\s*\[\d*$/, '');
   if (s.endsWith('*') && !s.endsWith('**')) s = s.slice(0, -1);
   if ((s.match(/\*\*/g) ?? []).length % 2 === 1) s = s.endsWith('**') ? s.slice(0, -2) : `${s}**`;
   return s;
+}
+
+/** Prefijo «tecleado» de un texto sin dejar marcas a medias. */
+export function typedPrefix(text: string, n: number): string {
+  if (n >= text.length) return text;
+  return balanceMarks(text.slice(0, Math.max(0, Math.floor(n))));
 }
 
 /** Texto con **negrita**, citas [n] pulsables y párrafos. */
