@@ -85,7 +85,7 @@ export default function App() {
       else if (e.key === 'ArrowRight' && inScenario) pb.skip();
       else if (k === 'v' && inScenario) setVariant(variant === 'webiq' ? 'bing' : 'webiq');
       else if (e.key === '0') setView({ kind: 'live' });
-      else if (/^[1-5]$/.test(e.key) && SCENARIOS[Number(e.key) - 1]) setView({ kind: 'scenario', id: SCENARIOS[Number(e.key) - 1].id });
+      else if (/^[1-6]$/.test(e.key) && SCENARIOS[Number(e.key) - 1]) setView({ kind: 'scenario', id: SCENARIOS[Number(e.key) - 1].id });
       else if (k === 'l') setLang(settings.lang === 'es' ? 'en' : 'es');
       else if (k === 's') setSettingsOpen(true);
     };

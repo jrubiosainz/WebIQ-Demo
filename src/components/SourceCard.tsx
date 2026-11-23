@@ -1,4 +1,4 @@
-import { Clapperboard, Image as ImageIcon, Languages, Link2, Radio } from 'lucide-react';
+import { BadgeCheck, Clapperboard, Image as ImageIcon, Languages, Link2, Radio } from 'lucide-react';
 import type { Source, Variant } from '../data/types';
 import { useI18n } from '../i18n';
 import { fmtClock, fmtDate, langName } from '../lib/format';
@@ -14,23 +14,54 @@ interface Props {
   flash?: boolean;
 }
 
+/** URL de la fuente: las reales y los documentos sintéticos se abren; las ficticias (.example) no. */
+function SourceUrl({ source: x }: { source: Source }) {
+  const { t } = useI18n();
+  if (!x.real && x.kind !== 'doc') {
+    return (
+      <span className="src-url" title={t('fakeDomain')}>
+        {x.url}
+      </span>
+    );
+  }
+  return (
+    <a className="src-url src-link" href={x.url} target="_blank" rel="noopener noreferrer">
+      {x.url}
+    </a>
+  );
+}
+
+/** Marca de procedencia: fuente pública real o documento sintético de Foundry IQ. */
+function Provenance({ source: x }: { source: Source }) {
+  const { t } = useI18n();
+  if (x.kind === 'doc') return <span className="chip src-doc">Foundry IQ · {t('syntheticDoc')}</span>;
+  if (x.real)
+    return (
+      <span className="chip src-real">
+        <BadgeCheck size={12} aria-hidden="true" />
+        {t('realSource')}
+      </span>
+    );
+  return null;
+}
+
 /** Una fuente tal como llega a la aplicación con cada variante. */
 export function SourceCard({ source: x, variant, n, final = true, flash = false }: Props) {
   const { t, lang } = useI18n();
   const cls = `src-card${flash ? ' flash' : ''}`;
 
-  if (variant === 'bing') {
+  // Los documentos de Foundry IQ llegan con pasaje en las dos variantes; solo las citas de Bing pierden pasaje y fecha.
+  if (variant === 'bing' && x.kind !== 'doc') {
     return (
       <article className={`${cls} bing`} data-src={x.id}>
         <header className="src-head">
           <Link2 size={14} aria-hidden="true" />
           <span className="src-pub">url_citation</span>
+          <Provenance source={x} />
           {n !== undefined && <span className="cite-badge">[{n}]</span>}
         </header>
         <h4 className="src-title">{x.title}</h4>
-        <span className="src-url" title={t('fakeDomain')}>
-          {x.url}
-        </span>
+        <SourceUrl source={x} />
         <dl className="src-missing">
           <div>
             <dt>{t('passage')}</dt>
@@ -58,14 +89,13 @@ export function SourceCard({ source: x, variant, n, final = true, flash = false 
           {langName(x.language, lang)}
         </span>
         {structured && <span className="chip">{t('structured')}</span>}
+        <Provenance source={x} />
         {n !== undefined ? <span className="cite-badge">[{n}]</span> : final ? <span className="src-unused">{t('retrieved')}</span> : null}
       </header>
       <h4 className="src-title" lang={x.language}>
         {x.title}
       </h4>
-      <span className="src-url" title={t('fakeDomain')}>
-        {x.url}
-      </span>
+      <SourceUrl source={x} />
       <blockquote className="src-excerpt" lang={x.language}>
         {x.excerpt}
       </blockquote>

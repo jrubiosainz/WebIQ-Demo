@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, Info, Radio, Sparkles, SquareTerminal } from 'lucide-react';
+import { ArrowUpRight, ChevronsLeft, ChevronsRight, Info, Radio, Sparkles, SquareTerminal } from 'lucide-react';
 import type { Scenario } from '../data/types';
 import { useI18n } from '../i18n';
 import { PRICES_CHECKED } from '../lib/cost';
@@ -6,7 +6,10 @@ import type { View } from '../lib/deeplink';
 import { fmtDate } from '../lib/format';
 import type { Settings } from '../lib/settings';
 import { ClientLogo } from './Brand';
-import { EndpointBadge, ScenarioIcon } from './Icon';
+import { EndpointBadge, GitHubMark, ScenarioIcon } from './Icon';
+
+const REPO = 'jrubiosainz/WebIQ-Demo';
+const REPO_URL = `https://github.com/${REPO}`;
 
 interface Props {
   scenarios: Scenario[];
@@ -135,6 +138,24 @@ export function Sidebar({ scenarios, view, settings, onSelect, onToggleCollapse 
           </span>
         </div>
       )}
+      <div className="sidebar-repo">
+        <a
+          className="repo-link"
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${t('viewOnGitHub')}: ${REPO}`}
+          title={t('viewOnGitHub')}
+        >
+          <GitHubMark size={18} />
+          {!collapsed && (
+            <>
+              <span className="repo-link-name">{REPO}</span>
+              <ArrowUpRight className="repo-link-ext" size={14} aria-hidden="true" />
+            </>
+          )}
+        </a>
+      </div>
     </nav>
   );
 }

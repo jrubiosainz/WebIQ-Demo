@@ -125,7 +125,7 @@ export function GuideView() {
     ['→', es ? 'Saltar al resultado' : 'Skip to the result'],
     ['V', es ? 'Cambiar entre Web IQ y Grounding with Bing' : 'Switch between Web IQ and Grounding with Bing'],
     ['0', es ? 'Caso 0 · en vivo' : 'Case 0 · live'],
-    ['1–5', es ? 'Ir a un caso' : 'Go to a case'],
+    ['1–6', es ? 'Ir a un caso' : 'Go to a case'],
     ['L', es ? 'Cambiar idioma' : 'Switch language'],
     ['S', es ? 'Abrir ajustes' : 'Open settings'],
   ];
@@ -136,8 +136,8 @@ export function GuideView() {
         <h1>{es ? 'Cómo probar Web IQ y presentar la demo' : 'How to try Web IQ and present the demo'}</h1>
         <p className="lede">
           {es
-            ? 'Los casos 1 a 5 son reproducciones guionizadas con datos ficticios, para que la demo funcione siempre y sin coste. El Caso 0 y la pestaña «En vivo» llaman a la API real de Web IQ con tu clave a través de un pequeño servidor.'
-            : 'Cases 1 to 5 are scripted replays with fictitious data, so the demo always works at no cost. Case 0 and the “Live” tab call the real Web IQ API with your key through a small server.'}
+            ? 'Los casos 1 a 5 son reproducciones guionizadas con datos ficticios, para que la demo funcione siempre y sin coste. El Caso 6 reproduce un agente de Foundry con contratos sintéticos (Foundry IQ) y noticias reales (Web IQ), y su pestaña «Agente de Foundry» lanza ese agente en vivo. El Caso 0 y la pestaña «En vivo» llaman a la API real de Web IQ con tu clave a través de un pequeño servidor.'
+            : 'Cases 1 to 5 are scripted replays with fictitious data, so the demo always works at no cost. Case 6 replays a Foundry agent over synthetic contracts (Foundry IQ) and real news (Web IQ), and its “Foundry agent” tab runs that agent live. Case 0 and the “Live” tab call the real Web IQ API with your key through a small server.'}
         </p>
       </header>
 

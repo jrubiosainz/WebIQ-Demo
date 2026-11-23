@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ICON_NAMES } from '../components/Icon';
 import { UI } from '../i18n';
@@ -63,8 +64,11 @@ function citeRefs(x: unknown, out: number[] = []): number[] {
 
 type AnswerStep = Extract<Step, { kind: 'answer' }>;
 type BingStep = Extract<Step, { kind: 'bing' }>;
+type KbStep = Extract<Step, { kind: 'kb' }>;
 const answerOf = (s: Scenario, v: Variant): AnswerStep => s.variants[v].steps.find((st): st is AnswerStep => st.kind === 'answer')!;
 const bingSteps = (s: Scenario): BingStep[] => s.variants.bing.steps.filter((st): st is BingStep => st.kind === 'bing');
+const kbResults = (s: Scenario, v: Variant): string[] =>
+  s.variants[v].steps.filter((st): st is KbStep => st.kind === 'kb').flatMap((st) => st.results);
 
 /* ───────── validación de peticiones según la referencia REST de Web IQ ───────── */
 
@@ -160,6 +164,9 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/;
 /** Las fuentes ficticias no pueden ser posteriores al día de la demo. */
 const DEMO_END = Date.parse('2026-10-29T00:00:00+01:00');
 const FICTITIOUS = /\((?:ficticio|fictitious|fittizio|fiktiv|fictício)\)$/;
+/** Documentos sintéticos indexados en Foundry IQ (public/foundry/…). */
+const DOC_URL = /^\/foundry\/[a-z0-9-]+\/\d{2}-[a-z0-9-]+\.md$/;
+const SYNTHETIC = /\(sintético\)$/;
 
 /* ───────────── tests ───────────── */
 
@@ -175,8 +182,8 @@ describe('textos', () => {
 });
 
 describe('catálogo', () => {
-  it('5 casos numerados del 1 al 5, con ids únicos aptos para enlaces', () => {
-    expect(SCENARIOS.map((s) => s.num)).toEqual([1, 2, 3, 4, 5]);
+  it('6 casos numerados del 1 al 6, con ids únicos aptos para enlaces', () => {
+    expect(SCENARIOS.map((s) => s.num)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(new Set(SCENARIOS.map((s) => s.id)).size).toBe(SCENARIOS.length);
     for (const s of SCENARIOS) {
       expect(s.id).toMatch(/^[a-z]+(?:-[a-z]+)*$/);
@@ -186,11 +193,11 @@ describe('catálogo', () => {
     expect(scenarioById(null)).toBeUndefined();
   });
 
-  it('cada cliente principal protagoniza un caso', () => {
-    expect(SCENARIOS.map((s) => s.primaryClient).sort()).toEqual([...CLIENT_IDS].sort());
+  it('cada cliente principal protagoniza al menos un caso', () => {
+    expect([...new Set(SCENARIOS.map((s) => s.primaryClient))].sort()).toEqual([...CLIENT_IDS].sort());
   });
 
-  it('entre los 5 casos se usan los 6 endpoints y los 4 tipos de artefacto', () => {
+  it('entre los casos se usan los 6 endpoints y los 4 tipos de artefacto', () => {
     expect(new Set(SCENARIOS.flatMap((s) => s.endpoints))).toEqual(new Set(ENDPOINTS));
     expect(new Set(SCENARIOS.map((s) => answerOf(s, 'webiq').artifact?.kind))).toEqual(new Set(['table', 'timeline', 'scorecard', 'cards']));
   });
@@ -214,14 +221,29 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('caso %s', (_id, s) => {
   });
 
   describe('fuentes', () => {
-    it('ficticias: https, dominios .example y editor marcado como ficticio', () => {
+    it('ficticias con dominio .example, reales verificadas y documentos sintéticos publicados', () => {
       for (const src of s.sources) {
-        const url = new URL(src.url);
-        expect(url.protocol, src.id).toBe('https:');
-        expect(url.hostname, src.id).toMatch(/\.example$/);
-        expect(src.publisher, src.id).toMatch(FICTITIOUS);
         expect(src.language, src.id).toMatch(/^[a-z]{2}$/);
         expect(src.title.trim(), src.id).not.toBe('');
+        if (src.kind === 'doc') {
+          // Documento interno de Foundry IQ: se sirve desde public/ y se marca como sintético.
+          expect(src.url, src.id).toMatch(DOC_URL);
+          expect(existsSync(`public${src.url}`), src.id).toBe(true);
+          expect(src.publisher, src.id).toMatch(SYNTHETIC);
+          expect(src.real, src.id).toBeUndefined();
+          continue;
+        }
+        const url = new URL(src.url);
+        expect(url.protocol, src.id).toBe('https:');
+        if (src.real) {
+          // Fuente pública real: dominio real, editor real y aviso en el caso.
+          expect(url.hostname, src.id).not.toMatch(/\.example$/);
+          expect(src.publisher, src.id).not.toMatch(FICTITIOUS);
+          expect(s.dataNote, src.id).toBeDefined();
+        } else {
+          expect(url.hostname, src.id).toMatch(/\.example$/);
+          expect(src.publisher, src.id).toMatch(FICTITIOUS);
+        }
       }
     });
 
@@ -273,7 +295,11 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('caso %s', (_id, s) => {
     });
 
     it('no hay fuentes huérfanas: todas las devuelve alguna llamada o la herramienta de Bing', () => {
-      const used = new Set([...calls.flatMap((c) => c.results), ...bingSteps(s).flatMap((b) => b.citations)]);
+      const used = new Set([
+        ...calls.flatMap((c) => c.results),
+        ...bingSteps(s).flatMap((b) => b.citations),
+        ...VARIANTS.flatMap((v) => kbResults(s, v)),
+      ]);
       for (const id of sources.keys()) expect(used.has(id), id).toBe(true);
     });
   });
@@ -312,14 +338,15 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('caso %s', (_id, s) => {
       }
     });
 
-    it('Web IQ solo cita fuentes que devolvió alguna de sus llamadas', () => {
-      const returned = new Set(calls.flatMap((c) => c.results));
+    it('Web IQ solo cita fuentes que devolvió alguna de sus llamadas (o Foundry IQ)', () => {
+      const returned = new Set([...calls.flatMap((c) => c.results), ...kbResults(s, 'webiq')]);
       for (const id of s.variants.webiq.citations) expect(returned.has(id), id).toBe(true);
     });
 
-    it('Bing solo cita páginas web o noticias que devolvió su herramienta', () => {
-      const returned = new Set(bingSteps(s).flatMap((b) => b.citations));
-      for (const id of returned) expect(['web', 'news'], id).toContain(sources.get(id)?.kind);
+    it('Bing solo cita páginas web o noticias que devolvió su herramienta (o Foundry IQ)', () => {
+      const fromBing = new Set(bingSteps(s).flatMap((b) => b.citations));
+      for (const id of fromBing) expect(['web', 'news'], id).toContain(sources.get(id)?.kind);
+      const returned = new Set([...fromBing, ...kbResults(s, 'bing')]);
       for (const id of s.variants.bing.citations) expect(returned.has(id), id).toBe(true);
     });
   });
@@ -445,6 +472,29 @@ describe.each(SCENARIOS.map((s) => [s.id, s] as const))('caso %s', (_id, s) => {
       expect(c.end).toBeLessThanOrEqual(st!.end);
     }
     expect(tl.total).toBeLessThan(60_000);
+  });
+
+  it.runIf(!!s.foundry)('agente de Foundry: mismo prompt que el agente real y sus documentos en Foundry IQ', () => {
+    const f = s.foundry!;
+    const user = s.variants.webiq.steps[0];
+    expect(user.kind === 'user' && user.text).toEqual(f.prompt);
+    // El guion y el agente desplegado usan exactamente el mismo prompt de referencia.
+    expect(readFileSync('foundry/run-agent.mjs', 'utf8')).toContain(`'${f.prompt.es}'`);
+    expect(f.docs.length).toBeGreaterThan(0);
+    for (const id of f.docs) expect(sources.get(id)?.kind, id).toBe('doc');
+    for (const v of VARIANTS) {
+      const kb = s.variants[v].steps.filter((st): st is KbStep => st.kind === 'kb');
+      expect(kb, v).toHaveLength(1);
+      expect(kb[0].knowledgeBase, v).toBe(f.knowledgeBase);
+      expect(new Set(kb[0].results), v).toEqual(new Set(f.docs));
+    }
+    expect(s.sources.filter((x) => x.kind === 'doc').map((x) => x.id).sort()).toEqual([...f.docs].sort());
+  });
+
+  it('sin agente de Foundry no hay documentos internos ni pasos de Foundry IQ', () => {
+    if (s.foundry) return;
+    expect(s.sources.filter((x) => x.kind === 'doc')).toEqual([]);
+    for (const v of VARIANTS) expect(kbResults(s, v), v).toEqual([]);
   });
 });
 

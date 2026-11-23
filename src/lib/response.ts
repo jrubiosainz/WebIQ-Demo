@@ -70,6 +70,7 @@ const AUTO_TYPE: Record<SourceKind, string> = {
   video: 'media/video',
   weather: 'structured/weather',
   timezone: 'structured/timeZone',
+  doc: 'text',
 };
 
 const CONTENT_SOURCE: Record<SourceKind, string> = {
@@ -80,6 +81,7 @@ const CONTENT_SOURCE: Record<SourceKind, string> = {
   video: 'videos',
   weather: 'weather',
   timezone: 'timezone',
+  doc: 'web',
 };
 
 function autoEvidence(x: Source, lang: Lang, structuredNote: string): Json {

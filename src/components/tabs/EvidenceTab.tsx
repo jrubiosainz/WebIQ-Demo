@@ -20,6 +20,8 @@ export function foundSources(s: Scenario, v: Variant, tl: Timeline, elapsed: num
   const add = (id: string) => {
     if (!ids.includes(id)) ids.push(id);
   };
+  // Foundry IQ (documentos internos) responde antes que la búsqueda web en las dos variantes.
+  for (const st of tl.steps) if (st.step.kind === 'kb' && st.end <= elapsed) st.step.results.forEach(add);
   if (v === 'webiq') {
     for (const c of tl.calls) if (c.end <= elapsed) c.call.results.forEach(add);
   } else {

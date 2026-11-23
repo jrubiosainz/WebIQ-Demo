@@ -1,4 +1,4 @@
-import { Bot, Check, Clock, ExternalLink, LoaderCircle, RotateCw, Search, TriangleAlert, Wrench, Zap } from 'lucide-react';
+import { BookOpen, Bot, Check, Clock, Database, ExternalLink, LoaderCircle, RotateCw, Search, TriangleAlert, Wrench, Zap } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { ENDPOINTS, type Scenario, type Source, type Step, type Variant } from '../data/types';
 import { useI18n } from '../i18n';
@@ -52,6 +52,7 @@ export function AgentStage({ scenario: s, variant: v, tl, elapsed, playing, sett
           <span className="ph-task">{tr(s.variants[v].label)}</span>
         </div>
         <div className="ph-meta">
+          {s.foundry && <span className="chip mono">Foundry IQ</span>}
           {v === 'webiq' ? s.endpoints.map((e) => <EndpointBadge key={e} endpoint={e} small />) : <span className="chip mono">bing_grounding</span>}
         </div>
       </header>
@@ -165,8 +166,8 @@ export function AgentStage({ scenario: s, variant: v, tl, elapsed, playing, sett
             <p>{t(v === 'webiq' ? 'receivesWebIQ' : 'receivesBing')}</p>
           </div>
           {settings.showDisclaimer && (
-            <p className="fictitious" title={t('fictitiousNote')}>
-              {t('fictitious')}
+            <p className="fictitious" title={t(s.dataNote ? 'mixedDataNote' : 'fictitiousNote')}>
+              {s.dataNote ? tr(s.dataNote) : t('fictitious')}
             </p>
           )}
         </aside>
@@ -232,7 +233,7 @@ function StepView({ ts, tl: timeline, scenario: s, variant: v, sources, elapsed,
   const p = progress(ts.start, ts.end, elapsed);
   const done = elapsed >= ts.end;
   const common = { 'data-step': st.id, className: `step step-${st.kind}${elapsed - ts.start < 260 ? ' entering' : ''}` };
-  const agentName = t(v === 'webiq' ? 'agentWebIQ' : 'agentBing');
+  const agentName = t(v === 'bing' ? 'agentBing' : s.foundry ? 'agentFoundry' : 'agentWebIQ');
 
   switch (st.kind) {
     case 'user': {
@@ -348,6 +349,68 @@ function StepView({ ts, tl: timeline, scenario: s, variant: v, sources, elapsed,
                   <ExternalLink size={12} aria-hidden="true" />
                   https://www.bing.com/search?q={st.query}
                 </a>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    case 'kb': {
+      const asked = Math.min(st.queries.length, Math.ceil((p / 0.55) * st.queries.length));
+      const showDocs = p >= 0.6;
+      const docs = st.results.map((id) => sources.get(id)).filter((x): x is Source => !!x);
+      const numbering = s.variants[v].citations;
+      return (
+        <div {...common}>
+          <div className="tool-card kb-card">
+            <div className="tool-head">
+              <span className="tool-icon">
+                <Database size={14} aria-hidden="true" />
+              </span>
+              <code className="tool-name">knowledge_base_retrieve</code>
+              <span className="tool-by">{t('kbTool')}</span>
+              <span className="tool-status">{showDocs ? <Check size={14} aria-label="OK" /> : <LoaderCircle size={13} className="spin" aria-hidden="true" />}</span>
+            </div>
+            <div className="bing-config">
+              <span className="chip mono">{st.knowledgeBase}</span>
+              <span className="chip">{tl(st.label)}</span>
+              {showDocs && <span className="chip mono">{st.latencyMs} ms</span>}
+            </div>
+            <div className="tool-args">
+              <span className="kv-label">{t('kbQueries')}</span>
+              <ul className="kb-queries">
+                {st.queries.slice(0, asked).map((q) => (
+                  <li key={q}>
+                    <code>{q}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {showDocs && (
+              <div className="tool-result kb-docs">
+                <span className="kv-label">
+                  {docs.length} {t('kbResults')}
+                </span>
+                <ol>
+                  {docs.map((x) => {
+                    const n = numbering.indexOf(x.id) + 1;
+                    return (
+                      <li key={x.id}>
+                        <button type="button" className="bing-cite" onClick={() => onSource(x.id)}>
+                          {n > 0 ? <span className="cite-badge">[{n}]</span> : <BookOpen size={14} className="kb-doc-icon" aria-hidden="true" />}
+                          <span className="bc-text">
+                            <span className="bc-title">{x.title}</span>
+                            <span className="bc-url">{x.url.split('/').pop()}</span>
+                          </span>
+                          <span className="bc-missing">
+                            <span className="chip">{t('syntheticDoc')}</span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
               </div>
             )}
           </div>

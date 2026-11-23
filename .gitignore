@@ -6,6 +6,9 @@ dist/
 .env
 .env.*
 !.env.example
+# Variables and secrets created by Azure CLI/Bicep.
+.azure/
+*.bicepparam
 # Análisis interno de clientes: NUNCA subir al repositorio
 privado/
 .copilot-azure/

@@ -2,13 +2,14 @@
   "name": "webiq-demo",
   "private": true,
   "version": "1.0.0",
-  "description": "Demo interactiva de Microsoft Web IQ: 5 casos de uso empresariales frente a Grounding with Bing Search (ES/EN, marca configurable).",
+  "description": "Demo interactiva de Microsoft Web IQ: seis casos de uso empresariales frente a Grounding with Bing Search (ES/EN, marca configurable).",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
     "live": "node server/index.mjs",
+    "set-key": "node scripts/set-webiq-key.mjs",
     "start": "npm run build && node server/index.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"

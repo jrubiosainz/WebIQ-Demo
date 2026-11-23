@@ -7,11 +7,12 @@ import { ApiTab } from './tabs/ApiTab';
 import { CompareTab } from './tabs/CompareTab';
 import { CostTab } from './tabs/CostTab';
 import { EvidenceTab } from './tabs/EvidenceTab';
+import { FoundryTab } from './tabs/FoundryTab';
 import { LiveTab } from './tabs/LiveTab';
 
-export type TabId = 'evidence' | 'compare' | 'cost' | 'api' | 'live';
-export const TAB_IDS: TabId[] = ['evidence', 'compare', 'cost', 'api', 'live'];
-const TAB_KEY: Record<TabId, UIKey> = { evidence: 'tabEvidence', compare: 'tabCompare', cost: 'tabCost', api: 'tabApi', live: 'tabLive' };
+export type TabId = 'evidence' | 'foundry' | 'compare' | 'cost' | 'api' | 'live';
+export const TAB_IDS: TabId[] = ['evidence', 'foundry', 'compare', 'cost', 'api', 'live'];
+const TAB_KEY: Record<TabId, UIKey> = { evidence: 'tabEvidence', foundry: 'tabFoundry', compare: 'tabCompare', cost: 'tabCost', api: 'tabApi', live: 'tabLive' };
 
 /** Fuente a resaltar en «Evidencias»; nonce permite repetir el resaltado de la misma fuente. */
 export interface SourceFocus {
@@ -19,7 +20,8 @@ export interface SourceFocus {
   nonce: number;
 }
 
-export const visibleTabs = (settings: Settings): TabId[] => TAB_IDS.filter((id) => id !== 'cost' || settings.showCosts);
+export const visibleTabs = (settings: Settings, scenario?: Scenario): TabId[] =>
+  TAB_IDS.filter((id) => (id !== 'cost' || settings.showCosts) && (id !== 'foundry' || !!scenario?.foundry));
 
 interface Props {
   scenario: Scenario;
@@ -34,7 +36,7 @@ interface Props {
 
 export function BottomPanel({ scenario: s, variant: v, tl, elapsed, settings, tab: wanted, onTab, focus }: Props) {
   const { t } = useI18n();
-  const tabs = visibleTabs(settings);
+  const tabs = visibleTabs(settings, s);
   const tab = tabs.includes(wanted) ? wanted : 'evidence';
 
   // Navegación de pestañas con flechas, Inicio y Fin (patrón WAI-ARIA).
@@ -52,6 +54,9 @@ export function BottomPanel({ scenario: s, variant: v, tl, elapsed, settings, ta
   switch (tab) {
     case 'evidence':
       body = <EvidenceTab scenario={s} variant={v} tl={tl} elapsed={elapsed} focus={focus} />;
+      break;
+    case 'foundry':
+      body = <FoundryTab key={s.id} scenario={s} />;
       break;
     case 'compare':
       body = <CompareTab scenario={s} />;

@@ -73,8 +73,8 @@ describe('formato y coste', () => {
     expect(fmtInt(1234.6, 'en')).toBe('1,235');
   });
 
-  it('calcula precios, cobertura y reintentos para los cinco casos', () => {
-    expect(SCENARIOS).toHaveLength(5);
+  it('calcula precios, cobertura y reintentos para los seis casos', () => {
+    expect(SCENARIOS).toHaveLength(6);
     for (const scenario of SCENARIOS) {
       const cost = runCost(scenario);
       expect(cost.calls).toBe(variantCalls(scenario).length);
@@ -210,7 +210,7 @@ describe('respuestas y modo en vivo', () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, hasKey: true, endpoints: ['web', 'invalid'] }) })
       .mockResolvedValueOnce({ status: 200, json: async () => ({ status: 201, latencyMs: '12', data: { ok: true } }) }));
-    expect(await getStatus()).toEqual({ ok: true, hasKey: true, auth: null, llm: false, model: null, needsCode: false, endpoints: ['web'] });
+    expect(await getStatus()).toEqual({ ok: true, hasKey: true, auth: null, llm: false, model: null, needsCode: false, endpoints: ['web'], foundry: false, foundryAgent: null });
     expect(await callLive('web', { query: 'hello' })).toEqual({ status: 201, latencyMs: 12, data: { ok: true } });
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await getStatus()).toBeNull();

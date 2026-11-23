@@ -4,6 +4,8 @@ param appServicePlanName string
 param tags object
 param llmEndpoint string = ''
 param llmModel string = 'gpt-5.4-mini'
+param foundryProjectEndpoint string = ''
+param foundryAgent string = ''
 @secure()
 param liveAccessCode string = ''
 @secure()
@@ -67,8 +69,19 @@ resource settings 'Microsoft.Web/sites/config@2026-08-01' = {
     WEBSITE_WARMUP_STATUSES: '200'
     // Front ends de App Service: la IP del visitante llega en X-Forwarded-For (límites por IP del Caso 0).
     TRUST_PROXY: '1'
+    LIVE_PER_MINUTE: '6'
+    LIVE_DAILY_LIMIT: '200'
+    LIVE_MAX_CONCURRENT: '4'
+    WEBIQ_PROXY_PER_MINUTE: '8'
+    WEBIQ_PROXY_DAILY_LIMIT: '200'
+    WEBIQ_PROXY_MAX_CONCURRENT: '8'
+    FOUNDRY_PER_MINUTE: '2'
+    FOUNDRY_DAILY_LIMIT: '60'
+    FOUNDRY_MAX_CONCURRENT: '2'
   },
   empty(llmEndpoint) ? {} : { LLM_ENDPOINT: llmEndpoint, LLM_MODEL: llmModel },
+  empty(foundryProjectEndpoint) ? {} : { FOUNDRY_PROJECT_ENDPOINT: foundryProjectEndpoint },
+  empty(foundryAgent) ? {} : { FOUNDRY_AGENT: foundryAgent },
   empty(liveAccessCode) ? {} : { LIVE_ACCESS_CODE: liveAccessCode },
   empty(webiqApiKey) ? {} : { WEBIQ_API_KEY: webiqApiKey })
 }

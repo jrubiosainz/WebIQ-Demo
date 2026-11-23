@@ -22,11 +22,14 @@ export const ENDPOINT_PATH: Record<Endpoint, string> = {
   auto: 'auto',
 };
 
-export type SourceKind = 'web' | 'news' | 'image' | 'video' | 'page' | 'weather' | 'timezone';
+/** «doc»: documento interno recuperado con Foundry IQ (knowledge base), no con Web IQ. */
+export type SourceKind = 'web' | 'news' | 'image' | 'video' | 'page' | 'weather' | 'timezone' | 'doc';
 
 export interface Source {
   id: string;
   kind: SourceKind;
+  /** Fuente pública real (URL y fragmento verificados), no ficticia. */
+  real?: boolean;
   /** Título en el idioma original de la fuente. */
   title: string;
   url: string;
@@ -120,6 +123,8 @@ export type Step =
   | { kind: 'user'; id: string; text: L }
   | { kind: 'plan'; id: string; text: L }
   | { kind: 'calls'; id: string; calls: WebIQCall[] }
+  /** Recuperación en Foundry IQ (knowledge_base_retrieve): resultados = ids de fuentes «doc». */
+  | { kind: 'kb'; id: string; label: L; knowledgeBase: string; queries: string[]; results: string[]; latencyMs: number }
   | { kind: 'reason'; id: string; text: L }
   | { kind: 'bing'; id: string; query: string; citations: string[]; config: string }
   | { kind: 'gap'; id: string; title: L; text: L; workaround: L }
@@ -178,4 +183,23 @@ export interface Scenario {
   cost: CostModel;
   live: LivePreset[];
   takeaways: L[];
+  /** Aviso sobre los datos si no son todos ficticios (por defecto, «Datos ficticios»). */
+  dataNote?: L;
+  /** Agente real de Foundry que se puede ejecutar en vivo desde la pestaña «Agente en vivo». */
+  foundry?: FoundryAgent;
+}
+
+export interface FoundryAgent {
+  name: string;
+  project: string;
+  model: string;
+  knowledgeBase: string;
+  /** Herramientas MCP del agente (server_label). */
+  tools: string[];
+  prompt: L;
+  /** Ids de las fuentes «doc» indexadas en la knowledge base. */
+  docs: string[];
+  /** Versión publicada del agente y enlace a su página en el portal de Foundry. */
+  version: string;
+  portal: string;
 }

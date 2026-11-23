@@ -3,7 +3,7 @@ import { request as httpRequest, createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CHAR_LIMIT, createApp, loadEnvFile, trimContent } from './index.mjs';
+import { CHAR_LIMIT, createApp, loadEnvFile, productionConfigError, trimContent } from './index.mjs';
 
 const KEY = 'test-key-123';
 const long = (n, ch = 'a') => ch.repeat(n);
@@ -42,6 +42,13 @@ const close = (server) =>
   });
 
 describe('servidor local', () => {
+  it('exige código de acceso en producción cuando el proxy tiene credenciales', () => {
+    expect(productionConfigError({ NODE_ENV: 'production' }, { mode: 'key' })).toMatch(/LIVE_ACCESS_CODE/);
+    expect(productionConfigError({ NODE_ENV: 'production', LIVE_ACCESS_CODE: 'a-secret-code' }, { mode: 'key' })).toBeNull();
+    expect(productionConfigError({ NODE_ENV: 'production' }, null)).toBeNull();
+    expect(productionConfigError({ NODE_ENV: 'development' }, { mode: 'key' })).toBeNull();
+  });
+
   const seen = [];
   let upstream;
   let upPort;
@@ -106,6 +113,8 @@ describe('servidor local', () => {
       model: null,
       needsCode: false,
       endpoints: ['web', 'news', 'images', 'videos', 'browse', 'auto'],
+      foundry: false,
+      foundryAgent: null,
     });
     expect(on.text).not.toContain(KEY);
     const off = await call(noKeyPort, { path: '/api/status' });
@@ -166,6 +175,52 @@ describe('servidor local', () => {
     expect((await call(port, { path: '/api/webiq/web' })).status).toBe(405);
     expect((await post(noKeyPort, 'web', { query: 'x' })).json.errorCode).toBe('MissingApiKey');
     expect(seen.length).toBe(before);
+  });
+
+  it('limita el proxy Web IQ por concurrencia y presupuesto diario compartidos entre endpoints', async () => {
+    let now = Date.UTC(2026, 10, 22);
+    let finishUpstream;
+    const pending = new Promise((resolve) => {
+      finishUpstream = resolve;
+    });
+    let upstreamCalls = 0;
+    const limited = createApp({
+      webiq: { mode: 'key', headers: async () => ({}) },
+      live: { accessCode: 'test-demo-code' },
+      proxyLimits: { perMinute: 1, dailyLimit: 2, maxConcurrent: 1 },
+      now: () => now,
+      fetch: async () => {
+        upstreamCalls += 1;
+        await pending;
+        return new Response(JSON.stringify({ webResults: [] }), { status: 200 });
+      },
+    });
+    const limitedPort = await listen(limited);
+    const request = (endpoint) =>
+      post(limitedPort, endpoint, { query: 'budget test' }, { 'x-demo-code': 'test-demo-code' });
+    try {
+      const firstRequest = request('web');
+      while (upstreamCalls === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+      const concurrent = await request('news');
+      expect(concurrent.status).toBe(429);
+      expect(concurrent.json.errorCode).toBe('Busy');
+      finishUpstream();
+      expect((await firstRequest).status).toBe(200);
+      const rateLimited = await request('images');
+      expect(rateLimited.status).toBe(429);
+      expect(rateLimited.json.errorCode).toBe('RateLimited');
+      expect(rateLimited.headers['retry-after']).toBeDefined();
+
+      now += 61_000;
+      expect((await request('news')).status).toBe(200);
+      const overBudget = await request('images');
+      expect(overBudget.status).toBe(429);
+      expect(overBudget.json.errorCode).toBe('DailyLimit');
+      expect(overBudget.headers['retry-after']).toBeDefined();
+      expect(upstreamCalls).toBe(2);
+    } finally {
+      await close(limited);
+    }
   });
 
   it('bloquea otros orígenes y hosts (CSRF y DNS rebinding)', async () => {

@@ -14,6 +14,9 @@ export interface LiveStatus {
   /** El servidor pide código de acceso (demo publicada). */
   needsCode: boolean;
   endpoints: Endpoint[];
+  /** Caso 6: el servidor puede ejecutar el agente de Foundry. */
+  foundry: boolean;
+  foundryAgent: string | null;
 }
 
 export interface LiveResponse {
@@ -39,6 +42,8 @@ export async function getStatus(timeoutMs = 2500): Promise<LiveStatus | null> {
       model: typeof j.model === 'string' && j.model ? j.model : null,
       needsCode: !!j.needsCode,
       endpoints: (j.endpoints ?? []).filter((e): e is Endpoint => ENDPOINTS.includes(e as Endpoint)),
+      foundry: !!j.foundry,
+      foundryAgent: typeof j.foundryAgent === 'string' && j.foundryAgent ? j.foundryAgent : null,
     };
   } catch {
     return null;
@@ -164,7 +169,7 @@ export const LIVE_MAX_PROMPT = 500;
 const CODE_KEY = 'webiq-demo-live-code';
 export const getAccessCode = (): string => readStored(CODE_KEY) ?? '';
 export const setAccessCode = (code: string): boolean => writeStored(CODE_KEY, code.trim());
-function codeHeader(): Record<string, string> {
+export function codeHeader(): Record<string, string> {
   const c = getAccessCode();
   return c ? { 'x-demo-code': c } : {};
 }
@@ -392,7 +397,7 @@ export class LiveHttpError extends Error {
   }
 }
 
-async function httpError(res: Response): Promise<LiveHttpError> {
+export async function httpError(res: Response): Promise<LiveHttpError> {
   let j: { errorCode?: string; userMessage?: string } = {};
   try {
     j = (await res.json()) as typeof j;

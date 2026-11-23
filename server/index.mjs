@@ -1,4 +1,4 @@
-// Servidor de la demo: sirve dist/, hace de proxy hacia la API de Web IQ y ejecuta el Caso 0 en vivo.
+// Servidor de la demo: sirve dist/, hace de proxy hacia la API de Web IQ, ejecuta el Caso 0 en vivo y el agente de Foundry del Caso 6.
 // Las credenciales (WEBIQ_API_KEY o Entra ID) se leen del entorno o de .env y nunca llegan al navegador. Sin dependencias.
 import { readFileSync, realpathSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
@@ -7,7 +7,8 @@ import { isIP } from 'node:net';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { llmFromEnv, webiqAuthFromEnv } from './auth.mjs';
-import { createLive } from './live.mjs';
+import { createFoundry, foundryFromEnv } from './foundry.mjs';
+import { clientIp, createLimiter, createLive } from './live.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -21,6 +22,12 @@ export const ENDPOINT_PATHS = {
   browse: '/browse',
   auto: '/auto',
 };
+
+export function productionConfigError(env, webiq) {
+  return env.NODE_ENV === 'production' && webiq && !env.LIVE_ACCESS_CODE?.trim()
+    ? 'LIVE_ACCESS_CODE is required in production when Web IQ credentials are configured.'
+    : null;
+}
 
 /** Requisitos de uso y visualización de Web IQ (Exhibit A): máx. 200 caracteres de Grounding Content por fuente. */
 export const CHAR_LIMIT = 200;
@@ -185,35 +192,48 @@ async function proxy(req, res, endpoint, opts) {
   const invalid = validate(endpoint, body);
   if (invalid) return fail(res, 400, 'InvalidRequest', invalid);
 
-  const started = performance.now();
-  let upstream;
+  const slot = opts.proxyLimiter.take(clientIp(req, opts.trustProxy));
+  if (!slot.ok) {
+    const msg = {
+      DailyLimit: 'The Web IQ API proxy reached its daily request limit.',
+      Busy: 'The Web IQ API proxy is busy. Try again in a few seconds.',
+      RateLimited: 'Too many Web IQ API requests. Wait a moment and try again.',
+    }[slot.code];
+    return fail(res, 429, slot.code, msg, { 'retry-after': String(slot.retryAfter) });
+  }
   try {
-    const auth = await opts.webiq.headers();
-    const qs = opts.webiq.appId ? `?APPID=${encodeURIComponent(opts.webiq.appId)}` : '';
-    upstream = await opts.fetch(`${opts.baseUrl}${ENDPOINT_PATHS[endpoint]}${qs}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', ...auth },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(opts.timeoutMs),
-    });
-  } catch (e) {
-    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
-      return fail(res, 504, 'UpstreamTimeout', `Web IQ did not answer within ${Math.round(opts.timeoutMs / 1000)} s.`);
-    }
-    return fail(res, 502, 'UpstreamUnreachable', `Could not reach Web IQ (${e?.cause?.code ?? e?.message ?? 'network error'}).`);
-  }
-  const text = await upstream.text();
-  const latencyMs = Math.round(performance.now() - started);
-  let data = null;
-  if (text) {
+    const started = performance.now();
+    let upstream;
     try {
-      data = JSON.parse(text);
-    } catch {
-      data = { rawContent: text.slice(0, 500) };
+      const auth = await opts.webiq.headers();
+      const qs = opts.webiq.appId ? `?APPID=${encodeURIComponent(opts.webiq.appId)}` : '';
+      upstream = await opts.fetch(`${opts.baseUrl}${ENDPOINT_PATHS[endpoint]}${qs}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json', ...auth },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(opts.timeoutMs),
+      });
+    } catch (e) {
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        return fail(res, 504, 'UpstreamTimeout', `Web IQ did not answer within ${Math.round(opts.timeoutMs / 1000)} s.`);
+      }
+      return fail(res, 502, 'UpstreamUnreachable', `Could not reach Web IQ (${e?.cause?.code ?? e?.message ?? 'network error'}).`);
     }
+    const text = await upstream.text();
+    const latencyMs = Math.round(performance.now() - started);
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { rawContent: text.slice(0, 500) };
+      }
+    }
+    // Sin caché ni almacenamiento: la respuesta solo vive mientras dura la petición.
+    return sendJson(res, 200, { status: upstream.status, latencyMs, data: trimContent(data) });
+  } finally {
+    slot.release();
   }
-  // Sin caché ni almacenamiento: la respuesta solo vive mientras dura la petición.
-  return sendJson(res, 200, { status: upstream.status, latencyMs, data: trimContent(data) });
 }
 
 async function serveStatic(req, res, distDir) {
@@ -257,6 +277,8 @@ async function serveStatic(req, res, distDir) {
  * - apiKey o webiq ({mode, headers(), appId}): credencial de Web IQ.
  * - llm ({endpoint, model, headers()}): modelo del Caso 0 (opcional).
  * - live: {accessCode, trustProxy, perMinute, dailyLimit, maxConcurrent, callTimeoutMs, planTimeoutMs, llmTimeoutMs}.
+ * - foundry ({endpoint, agent, headers()}): agente del Caso 6 (opcional); foundryLimits: {perMinute, dailyLimit, maxConcurrent, timeoutMs}.
+ * - proxyLimits: límites por IP/minuto, global/UTC-day y de concurrencia del proxy de llamadas individuales.
  * - baseUrl, distDir, timeoutMs, allowedHosts (nombres extra además de localhost e IP), fetch y now (tests).
  */
 export function createApp(options = {}) {
@@ -267,14 +289,29 @@ export function createApp(options = {}) {
     distDir: options.distDir ?? join(ROOT, 'dist'),
     timeoutMs: options.timeoutMs ?? 30_000,
     allowedHosts: (options.allowedHosts ?? []).map((h) => h.trim().toLowerCase()).filter(Boolean),
+    trustProxy: !!options.live?.trustProxy,
     fetch: options.fetch ?? globalThis.fetch,
   };
+  opts.proxyLimiter = createLimiter({
+    perMinute: options.proxyLimits?.perMinute ?? 8,
+    dailyLimit: options.proxyLimits?.dailyLimit ?? 200,
+    maxConcurrent: options.proxyLimits?.maxConcurrent ?? 8,
+    now: options.now,
+  });
   const live = createLive({
     ...options.live,
     webiq: opts.webiq,
     llm: options.llm ?? null,
     baseUrl: opts.baseUrl,
     paths: ENDPOINT_PATHS,
+    fetch: opts.fetch,
+    now: options.now,
+    log: options.log,
+  });
+  const foundry = createFoundry({
+    ...options.foundryLimits,
+    foundry: options.foundry ?? null,
+    trustProxy: options.live?.trustProxy,
     fetch: opts.fetch,
     now: options.now,
     log: options.log,
@@ -293,6 +330,8 @@ export function createApp(options = {}) {
           model: options.llm?.model ?? null,
           needsCode: live.needsCode,
           endpoints: Object.keys(ENDPOINT_PATHS),
+          foundry: foundry.available,
+          foundryAgent: foundry.agent,
         });
       }
       const isApi = pathname.startsWith('/api/');
@@ -310,6 +349,13 @@ export function createApp(options = {}) {
         const body = await readJson(req, res);
         if (!body) return;
         return await live.ask(req, res, body, fail);
+      }
+      if (pathname === '/api/foundry/ask') {
+        if (req.method !== 'POST') return fail(res, 405, 'MethodNotAllowed', 'Use POST.', { allow: 'POST' });
+        if (!live.authorize(req, res, fail)) return;
+        const body = await readJson(req, res);
+        if (!body) return;
+        return await foundry.ask(req, res, body, fail);
       }
       const m = pathname.match(/^\/api\/webiq\/([a-z]+)\/?$/);
       if (m) {
@@ -341,7 +387,13 @@ if (isMain()) {
   const host = process.env.HOST || '127.0.0.1';
   const env = process.env;
   const webiq = webiqAuthFromEnv(env);
+  const configError = productionConfigError(env, webiq);
+  if (configError) {
+    console.error(`Configuración insegura: ${configError}`);
+    process.exit(1);
+  }
   const llm = llmFromEnv(env);
+  const foundry = foundryFromEnv(env);
   const int = (v, d) => (v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
   const app = createApp({
     webiq,
@@ -354,6 +406,17 @@ if (isMain()) {
       perMinute: int(env.LIVE_PER_MINUTE, 6),
       dailyLimit: int(env.LIVE_DAILY_LIMIT, 200),
       maxConcurrent: int(env.LIVE_MAX_CONCURRENT, 4),
+    },
+    proxyLimits: {
+      perMinute: int(env.WEBIQ_PROXY_PER_MINUTE, 8),
+      dailyLimit: int(env.WEBIQ_PROXY_DAILY_LIMIT, 200),
+      maxConcurrent: int(env.WEBIQ_PROXY_MAX_CONCURRENT, 8),
+    },
+    foundry,
+    foundryLimits: {
+      perMinute: int(env.FOUNDRY_PER_MINUTE, 2),
+      dailyLimit: int(env.FOUNDRY_DAILY_LIMIT, 60),
+      maxConcurrent: int(env.FOUNDRY_MAX_CONCURRENT, 2),
     },
     log: (line) => console.log(line),
   });
@@ -369,6 +432,7 @@ if (isMain()) {
         : '  Falta WEBIQ_API_KEY: copia .env.example a .env para la pestaña «En vivo» y el Caso 0.',
     );
     console.log(llm ? `  Caso 0: modelo ${llm.model} en ${new URL(llm.endpoint).host}.` : '  Sin LLM_ENDPOINT: el Caso 0 muestra resultados sin respuesta redactada.');
+    console.log(foundry ? `  Caso 6: agente ${foundry.agent} en ${new URL(foundry.endpoint).host}.` : '  Sin FOUNDRY_PROJECT_ENDPOINT/FOUNDRY_AGENT: el Caso 6 no ejecuta el agente en vivo.');
     if (env.LIVE_ACCESS_CODE) console.log('  Código de acceso activo (LIVE_ACCESS_CODE).');
     console.log('  Desarrollo: deja este servidor en marcha y usa «npm run dev» (proxy /api).');
   });

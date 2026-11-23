@@ -29,7 +29,7 @@ export interface DeepLink {
   settingsOpen: boolean;
 }
 
-/** Número del caso (1-5) o su id. */
+/** Número del caso (1-6) o su id. */
 function scenarioFrom(v: string | null): string | null {
   if (!v) return null;
   if (/^\d+$/.test(v)) return SCENARIOS[Number(v) - 1]?.id ?? null;

@@ -3,17 +3,23 @@ targetScope = 'subscription'
 @description('Region de la demo, independiente de Decision-1.')
 param location string = 'spaincentral'
 
-param resourceGroupName string = 'rg-webiq-demo-dev-d88a'
-param appServiceName string = 'app-webiq-demo-dev-d88a'
-param appServicePlanName string = 'plan-webiq-demo-dev-d88a'
-param environmentName string = 'webiq-demo-dev-d88a'
-param sessionId string = 'd88a9083-4855-48f8-8a45-042b18f51f52'
+@description('Nombre del grupo de recursos que se creará en la suscripción seleccionada.')
+param resourceGroupName string
+@description('Nombre único global para la Azure Web App.')
+param appServiceName string
+@description('Nombre del App Service plan.')
+param appServicePlanName string
+param environmentName string = 'demo'
 param deployedBy string
 param createdAt string = utcNow()
 
 @description('Endpoint OpenAI v1 del modelo que planifica y redacta el Caso 0. Vacío: el Caso 0 busca la pregunta tal cual.')
-param llmEndpoint string = 'https://aif-fiq-ceyx0f.cognitiveservices.azure.com/openai/v1'
+param llmEndpoint string = ''
 param llmModel string = 'gpt-5.4-mini'
+@description('Endpoint del proyecto de Foundry para activar el agente del Caso 6. Vacío: lo deja desactivado.')
+param foundryProjectEndpoint string = ''
+@description('Nombre del agente de Foundry del Caso 6.')
+param foundryAgent string = 'revisor-contratos-telco'
 
 @secure()
 @description('Código que pide la web para usar el Caso 0. Vacío: se elimina el ajuste y el Caso 0 queda abierto.')
@@ -24,8 +30,6 @@ param liveAccessCode string = ''
 param webiqApiKey string = ''
 
 var tags = {
-  'app-onboard-skill': 'true'
-  'app-onboard-session-id': sessionId
   'created-at': createdAt
   environment: environmentName
   'deployed-by': deployedBy
@@ -48,6 +52,8 @@ module app './app.bicep' = {
     tags: tags
     llmEndpoint: llmEndpoint
     llmModel: llmModel
+    foundryProjectEndpoint: foundryProjectEndpoint
+    foundryAgent: foundryAgent
     liveAccessCode: liveAccessCode
     webiqApiKey: webiqApiKey
   }

@@ -42,6 +42,8 @@ export function stepDuration(step: Step): number {
       return typingMs(step.text, 22, 900, 2600);
     case 'bing':
       return 3200;
+    case 'kb':
+      return 2200;
     case 'gap':
       return 1100;
     case 'answer':

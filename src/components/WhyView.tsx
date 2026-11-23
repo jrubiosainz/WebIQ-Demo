@@ -63,7 +63,7 @@ export function WhyView({ scenarios, settings, onOpen }: Props) {
       </header>
 
       <section aria-labelledby="why-cases">
-        <h2 id="why-cases">{es ? 'Los cinco casos de un vistazo' : 'The five cases at a glance'}</h2>
+        <h2 id="why-cases">{es ? 'Los seis casos de un vistazo' : 'The six cases at a glance'}</h2>
         <div className="table-scroll">
           <table className="data cases-table">
             <thead>
