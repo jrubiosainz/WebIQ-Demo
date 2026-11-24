@@ -11,7 +11,7 @@ export const reputation: Scenario = {
   id: 'reputation-crisis',
   num: 3,
   icon: 'Megaphone',
-  primaryClient: 'barcelo',
+  primaryClient: 'hospitality',
   sector: l('Hoteles · Comunicación', 'Hotels · Communications'),
   title: l('Crisis de reputación en tiempo real', 'Real-time reputation crisis'),
   tagline: l(
@@ -27,23 +27,23 @@ export const reputation: Scenario = {
     'Detect a crisis as soon as it starts and respond with data, not hunches.',
   ),
   clientFit: {
-    barcelo: l(
+    hospitality: l(
       'Incidencias de cobro, servicio o seguridad en hoteles: qué se dice en cada mercado emisor y desde cuándo.',
       'Billing, service or safety incidents at hotels: what each source market is saying and since when.',
     ),
-    iberdrola: l(
+    energy: l(
       'Cortes de suministro, facturas o campañas: cobertura por región y vídeos de clientes afectados.',
       'Outages, bills or campaigns: coverage by region and videos from affected customers.',
     ),
-    w2m: l(
+    travel: l(
       'Cancelaciones, overbooking o huelgas que afectan a viajeros: qué publican medios y vídeos en cada país.',
       'Cancellations, overbooking or strikes affecting travellers: what press and videos say in each country.',
     ),
-    segurcaixa: l(
+    insurance: l(
       'Quejas sobre siniestros o cambios de póliza que se viralizan, y si ya hay una respuesta publicada.',
       'Viral complaints about claims or policy changes, and whether a response is already published.',
     ),
-    cam: l(
+    'public-sector': l(
       'Incidencias en servicios públicos (transporte, sanidad, educación) y su cobertura en prensa y vídeo.',
       'Public service incidents (transport, health, education) and their press and video coverage.',
     ),

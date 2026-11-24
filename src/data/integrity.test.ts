@@ -505,10 +505,11 @@ describe('marca y accesibilidad', () => {
     ...THEME_PRESETS.map((p): [string, ThemeColors] => [`tema ${p.id}`, p.colors]),
   ];
 
-  it('cada cliente (y «Otro cliente») tiene nombre, monograma y colores válidos', () => {
+  it('cada perfil sectorial tiene nombre bilingüe, monograma y colores válidos', () => {
     expect(CLIENTS.map((c) => c.id)).toEqual([...CLIENT_IDS, 'custom']);
     for (const c of CLIENTS) {
-      expect(c.name.trim()).not.toBe('');
+      expect(isL(c.name)).toBe(true);
+      for (const name of Object.values(c.name)) expect(name.trim()).not.toBe('');
       expect(c.monogram.length).toBeLessThanOrEqual(3);
       for (const v of Object.values(c.brand)) expect(v, c.id).toMatch(HEX);
     }

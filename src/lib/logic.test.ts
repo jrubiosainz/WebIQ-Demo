@@ -106,7 +106,7 @@ describe('reproducción y enlaces profundos', () => {
   });
 
   it('valida parámetros de URL y conserva la prioridad de escenario', () => {
-    const link = parseDeepLink('?scenario=2&variant=bing&lang=en&client=barcelo&theme=dark&view=why&settings=open&t=end');
+    const link = parseDeepLink('?scenario=2&variant=bing&lang=en&client=hospitality&theme=dark&view=why&settings=open&t=end');
     expect(link.scenario).toBe(SCENARIOS[1].id);
     expect(link.variant).toBe('bing');
     expect(link.seek).toBe('end');
@@ -124,22 +124,22 @@ describe('reproducción y enlaces profundos', () => {
 
   it('aplica cliente e idioma sin mutar ajustes y permite sobreescribir marca con tema', () => {
     const original = { ...DEFAULT_SETTINGS, colors: { ...DEFAULT_SETTINGS.colors } };
-    const linked = withDeepLink(original, parseDeepLink('?client=barcelo&lang=en&theme=dark'));
+    const linked = withDeepLink(original, parseDeepLink('?client=hospitality&lang=en&theme=dark'));
     expect(original.lang).toBe('es');
     expect(linked.lang).toBe('en');
     expect(linked.colors).toEqual(THEME_PRESETS.find((p) => p.id === 'dark')?.colors);
     expect(withDeepLink(original, parseDeepLink(''))).toBe(original);
-    expect(brandColors(original, 'barcelo').accent).toBe(CLIENTS.find((c) => c.id === 'barcelo')?.brand.accent);
+    expect(brandColors(original, 'hospitality').accent).toBe(CLIENTS.find((c) => c.id === 'hospitality')?.brand.accent);
   });
 });
 
 describe('ajustes, persistencia y tema', () => {
   it('sanea valores importados y resuelve nombre, acento y tipografías', () => {
     const s = sanitizeSettings({
-      lang: 'en', activeClient: 'barcelo', speed: 9, fontSize: 99, radius: -1,
+      lang: 'en', activeClient: 'hospitality', speed: 9, fontSize: 99, radius: -1,
       colors: { app: '#123456', panel: 'red' },
-      logos: { barcelo: 'data:image/png;base64,abc', unknown: 'data:image/png;base64,def' },
-      clientNames: { barcelo: '  Cliente  ' }, clientAccents: { barcelo: '#abcdef', custom: 'rgb(0,0,0)' },
+      logos: { hospitality: 'data:image/png;base64,abc', unknown: 'data:image/png;base64,def' },
+      clientNames: { hospitality: '  Custom name  ' }, clientAccents: { hospitality: '#abcdef', custom: 'rgb(0,0,0)' },
     });
     expect(s.lang).toBe('en');
     expect(s.speed).toBe(DEFAULT_SETTINGS.speed);
@@ -147,12 +147,35 @@ describe('ajustes, persistencia y tema', () => {
     expect(s.radius).toBe(0);
     expect(s.colors.app).toBe('#123456');
     expect(s.colors.panel).toBe(DEFAULT_SETTINGS.colors.panel);
-    expect(s.logos.barcelo).toContain('data:image/');
+    expect(s.logos.hospitality).toContain('data:image/');
     expect(s.logos).not.toHaveProperty('unknown');
-    expect(clientName(s, 'barcelo')).toBe('Cliente');
-    expect(clientAccent(s, 'barcelo')).toBe('#abcdef');
+    expect(clientName(s, 'hospitality')).toBe('Custom name');
+    expect(clientAccent(s, 'hospitality')).toBe('#abcdef');
     expect(fontFamily({ ...s, fontUi: 'custom', fontUiCustom: " Serif' " })).toBe("'Serif', system-ui, sans-serif");
     expect(monoFamily(s)).toContain('JetBrains Mono');
+  });
+
+  it('uses localized sector names unless the user supplies a custom name', () => {
+    const s = sanitizeSettings({ lang: 'en', clientNames: { hospitality: '  ' } });
+    expect(clientName(s, 'hospitality')).toBe('Hospitality');
+    expect(clientName({ ...s, lang: 'es' }, 'hospitality')).toBe('Hostelería');
+    expect(clientName(s, 'public-sector')).toBe('Public sector');
+    expect(clientName(s, 'custom')).toBe('Custom');
+  });
+
+  it('does not restore names or logos from retired organization profiles', () => {
+    const retired = 'retired-organization';
+    const s = sanitizeSettings({
+      activeClient: retired,
+      logos: { [retired]: 'data:image/png;base64,abc' },
+      clientNames: { [retired]: 'Private organization' },
+      clientAccents: { [retired]: '#123456' },
+    });
+    expect(s.activeClient).toBe('none');
+    expect(s.logos).toEqual({});
+    expect(s.clientNames).toEqual({});
+    expect(s.clientAccents).toEqual({});
+    expect(parseDeepLink(`?client=${retired}`).client).toBeNull();
   });
 
   it('persiste ajustes y aplica variables CSS y el idioma al documento', () => {

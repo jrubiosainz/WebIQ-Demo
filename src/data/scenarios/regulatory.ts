@@ -6,7 +6,7 @@ export const regulatory: Scenario = {
   id: 'regulatory-watch',
   num: 1,
   icon: 'Landmark',
-  primaryClient: 'segurcaixa',
+  primaryClient: 'insurance',
   sector: l('Seguros · Cumplimiento', 'Insurance · Compliance'),
   title: l('Vigilancia regulatoria con fuente oficial', 'Regulatory watch from the official source'),
   tagline: l(
@@ -22,23 +22,23 @@ export const regulatory: Scenario = {
     'Learn about every regulatory change in time and know exactly what it requires.',
   ),
   clientFit: {
-    segurcaixa: l(
+    insurance: l(
       'Guías del supervisor y de la autoridad europea sobre IA, distribución y siniestros, con plazos y texto oficial.',
       'Regulator and EU authority guidance on AI, distribution and claims, with deadlines and official text.',
     ),
-    iberdrola: l(
+    energy: l(
       'Resoluciones del regulador energético, boletines oficiales y consultas europeas sobre mercado eléctrico.',
       'Energy regulator decisions, official gazettes and EU consultations on the power market.',
     ),
-    barcelo: l(
+    hospitality: l(
       'Tasas turísticas, alquiler vacacional y normativa fiscal en cada país donde opera la cadena.',
       'Tourist taxes, holiday-rental rules and tax regulation in every country where the chain operates.',
     ),
-    w2m: l(
+    travel: l(
       'Requisitos de entrada, autorizaciones de viaje y derechos del pasajero publicados por cada autoridad.',
       'Entry requirements, travel authorisations and passenger rights published by each authority.',
     ),
-    cam: l(
+    'public-sector': l(
       'Boletines estatales y autonómicos sobre contratación pública, ayudas y normativa sectorial.',
       'National and regional gazettes on public procurement, grants and sector regulation.',
     ),

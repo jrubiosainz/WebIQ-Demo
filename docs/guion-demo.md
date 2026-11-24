@@ -6,7 +6,7 @@
 
 > «Web IQ no es solo una búsqueda para un chatbot. Permite combinar búsqueda web, noticias, vídeo, imágenes, lectura de páginas y respuestas estructuradas. Vamos a ver seis tareas que hoy suelen exigir varias consultas, herramientas o código de integración.»
 
-Selecciona el cliente que mejor encaje con la audiencia. En **Ajustes** puedes cambiar el idioma, aplicar una paleta, editar colores o subir un logo autorizado. Mantén activada la marca neutral si no tienes permiso para usar la identidad visual del cliente.
+Selecciona un perfil sectorial genérico que encaje con la audiencia o mantén **Neutral**. En **Ajustes** puedes cambiar el idioma, aplicar una paleta o editar colores. No se incluyen nombres ni logos de clientes; cualquier marca autorizada que añadas es para tu propia presentación y no debe entrar en el ejemplo público.
 
 ## Caso 0 · En vivo (opcional, 2–3 minutos)
 

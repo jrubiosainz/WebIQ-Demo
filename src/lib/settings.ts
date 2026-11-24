@@ -157,7 +157,7 @@ export function sanitizeSettings(input: unknown): Settings {
 
 export const saveSettings = (s: Settings): { ok: boolean } => ({ ok: writeStored(KEY, JSON.stringify(s)) });
 
-export const clientName = (s: Settings, id: BrandId): string => s.clientNames[id]?.trim() || clientById(id).name;
+export const clientName = (s: Settings, id: BrandId): string => s.clientNames[id]?.trim() || clientById(id).name[s.lang];
 export const clientAccent = (s: Settings, id: BrandId): string => s.clientAccents[id] || clientById(id).brand.accent;
 
 export function brandColors(s: Settings, id: BrandId): ThemeColors {

@@ -2,7 +2,7 @@ export type Lang = 'es' | 'en';
 export type L = { es: string; en: string };
 export const l = (es: string, en: string): L => ({ es, en });
 
-export type ClientId = 'iberdrola' | 'barcelo' | 'w2m' | 'segurcaixa' | 'cam';
+export type ClientId = 'energy' | 'hospitality' | 'travel' | 'insurance' | 'public-sector';
 export type BrandId = ClientId | 'custom';
 
 /** Cada caso se reproduce con Web IQ o con Grounding with Bing Search (agente de Foundry). */

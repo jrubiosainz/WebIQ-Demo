@@ -4,7 +4,7 @@ Se agradecen los informes de errores y las pull requests acotadas. Para cambios 
 
 ## Desarrollo
 
-- Usa Node.js 22 o posterior.
+- Usa Node.js 22.12 o posterior.
 - Instala las dependencias con `npm ci`.
 - Ejecuta `npm test` y `npm run build` antes de enviar una pull request.
 - Añade o actualiza pruebas específicas para el comportamiento que cambies.

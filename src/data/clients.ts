@@ -2,58 +2,58 @@ import { l, type BrandId, type ClientId, type L } from './types';
 
 export interface ClientDef {
   id: BrandId;
-  name: string;
+  name: L;
   monogram: string;
   sector: L;
-  /** Colores aproximados de marca: editables en Ajustes. */
+  /** Generic sector palettes, editable in Settings; not customer brand colors. */
   brand: { accent: string; sidebar: string; app: string; panel: string; header: string };
 }
 
 export const CLIENTS: ClientDef[] = [
   {
-    id: 'iberdrola',
-    name: 'Iberdrola',
-    monogram: 'IB',
+    id: 'energy',
+    name: l('Energía', 'Energy'),
+    monogram: 'EN',
     sector: l('Energía', 'Energy'),
-    brand: { accent: '#00A443', sidebar: '#0B3B2C', app: '#F1F6F3', panel: '#FFFFFF', header: '#FFFFFF' },
+    brand: { accent: '#0F766E', sidebar: '#10252A', app: '#F1F5F5', panel: '#FFFFFF', header: '#FFFFFF' },
   },
   {
-    id: 'barcelo',
-    name: 'Barceló',
-    monogram: 'BHG',
+    id: 'hospitality',
+    name: l('Hostelería', 'Hospitality'),
+    monogram: 'HO',
     sector: l('Hoteles y turismo', 'Hotels and travel'),
-    brand: { accent: '#A9844F', sidebar: '#1C2733', app: '#F6F3EE', panel: '#FFFFFF', header: '#FFFFFF' },
+    brand: { accent: '#9A3412', sidebar: '#292018', app: '#FAF5EF', panel: '#FFFFFF', header: '#FFFFFF' },
   },
   {
-    id: 'w2m',
-    name: 'W2M',
-    monogram: 'W2M',
+    id: 'travel',
+    name: l('Viajes', 'Travel'),
+    monogram: 'TR',
     sector: l('Distribución turística', 'Travel distribution'),
-    brand: { accent: '#6B2FA3', sidebar: '#1E1433', app: '#F5F2F9', panel: '#FFFFFF', header: '#FFFFFF' },
+    brand: { accent: '#475569', sidebar: '#17202D', app: '#F1F5F9', panel: '#FFFFFF', header: '#FFFFFF' },
   },
   {
-    id: 'segurcaixa',
-    name: 'SegurCaixa Adeslas',
-    monogram: 'SCA',
+    id: 'insurance',
+    name: l('Seguros', 'Insurance'),
+    monogram: 'IN',
     sector: l('Seguros y salud', 'Insurance and health'),
-    brand: { accent: '#0072CE', sidebar: '#002A4D', app: '#F0F5FB', panel: '#FFFFFF', header: '#FFFFFF' },
+    brand: { accent: '#4338CA', sidebar: '#1E1B3A', app: '#F5F3FF', panel: '#FFFFFF', header: '#FFFFFF' },
   },
   {
-    id: 'cam',
-    name: 'Comunidad de Madrid',
-    monogram: 'CM',
+    id: 'public-sector',
+    name: l('Sector público', 'Public sector'),
+    monogram: 'PS',
     sector: l('Sector público', 'Public sector'),
-    brand: { accent: '#D0202E', sidebar: '#2A2A2E', app: '#F6F4F4', panel: '#FFFFFF', header: '#FFFFFF' },
+    brand: { accent: '#0369A1', sidebar: '#132838', app: '#F0F7FA', panel: '#FFFFFF', header: '#FFFFFF' },
   },
   {
     id: 'custom',
-    name: 'Otro cliente',
+    name: l('Personalizado', 'Custom'),
     monogram: '+',
     sector: l('Personalizado', 'Custom'),
     brand: { accent: '#0F766E', sidebar: '#10252A', app: '#F1F5F5', panel: '#FFFFFF', header: '#FFFFFF' },
   },
 ];
 
-export const CLIENT_IDS: ClientId[] = ['iberdrola', 'barcelo', 'w2m', 'segurcaixa', 'cam'];
+export const CLIENT_IDS: ClientId[] = ['energy', 'hospitality', 'travel', 'insurance', 'public-sector'];
 
 export const clientById = (id: BrandId): ClientDef => CLIENTS.find((c) => c.id === id) ?? CLIENTS[0];

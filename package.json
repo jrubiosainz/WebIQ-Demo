@@ -2,7 +2,7 @@
   "name": "webiq-demo",
   "private": true,
   "version": "1.0.0",
-  "description": "Demo interactiva de Microsoft Web IQ: seis casos de uso empresariales frente a Grounding with Bing Search (ES/EN, marca configurable).",
+  "description": "Interactive Microsoft Web IQ enterprise scenarios with a live playground, bilingual UI, and customer-neutral sector profiles.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -39,6 +39,6 @@
     "vitest": "^5.0.5"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   }
 }

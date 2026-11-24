@@ -11,7 +11,7 @@ export const traveler: Scenario = {
   id: 'traveler-assistant',
   num: 5,
   icon: 'Plane',
-  primaryClient: 'w2m',
+  primaryClient: 'travel',
   sector: l('Viajes · Atención al cliente', 'Travel · Customer care'),
   title: l('Asistente del viajero en destino', 'In-destination traveller assistant'),
   tagline: l(
@@ -27,23 +27,23 @@ export const traveler: Scenario = {
     'Answer customers with local, current, useful information at the moment they need it.',
   ),
   clientFit: {
-    w2m: l(
+    travel: l(
       'Asistente para viajeros en destino: llegada, transporte, huelgas, tiempo y vídeos útiles.',
       'In-destination traveller assistant: arrival, transport, strikes, weather and helpful videos.',
     ),
-    barcelo: l(
+    hospitality: l(
       'Concierge digital del hotel: tiempo, transporte y eventos cerca del hotel, con imágenes y vídeos.',
       'Digital hotel concierge: weather, transport and events near the hotel, with images and videos.',
     ),
-    iberdrola: l(
+    energy: l(
       'Asistente para brigadas de campo: tiempo y avisos locales en la ubicación de cada intervención.',
       'Assistant for field crews: local weather and notices at each job location.',
     ),
-    segurcaixa: l(
+    insurance: l(
       'Asistencia en viaje: tiempo, huelgas y avisos en destino para asegurados con una incidencia.',
       'Travel assistance: weather, strikes and local notices for policyholders with an incident abroad.',
     ),
-    cam: l(
+    'public-sector': l(
       'Atención ciudadana y turismo: tiempo, transporte y avisos de servicio, con imágenes y vídeos.',
       'Citizen services and tourism: weather, transport and service notices, with images and videos.',
     ),

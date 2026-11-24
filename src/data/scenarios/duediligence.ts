@@ -15,7 +15,7 @@ export const duediligence: Scenario = {
   id: 'third-party-dd',
   num: 4,
   icon: 'ShieldCheck',
-  primaryClient: 'cam',
+  primaryClient: 'public-sector',
   sector: l('Sector público · Contratación', 'Public sector · Procurement'),
   title: l('Due diligence de proveedores y licitadores', 'Supplier and bidder due diligence'),
   tagline: l(
@@ -31,23 +31,23 @@ export const duediligence: Scenario = {
     'Never award or sign without thoroughly vetting the other party, and be able to prove it.',
   ),
   clientFit: {
-    cam: l(
+    'public-sector': l(
       'Revisión de licitadores antes de adjudicar contratos públicos: sanciones, cambios societarios y prensa.',
       'Vetting bidders before awarding public contracts: sanctions, corporate changes and press.',
     ),
-    iberdrola: l(
+    energy: l(
       'Homologación de proveedores y contratistas de obra en varios países.',
       'Qualifying suppliers and construction contractors across several countries.',
     ),
-    barcelo: l(
+    hospitality: l(
       'Revisión de propietarios y socios antes de firmar la gestión de un hotel.',
       'Vetting owners and partners before signing a hotel management agreement.',
     ),
-    w2m: l(
+    travel: l(
       'Revisión de proveedores en destino (receptivos, traslados) antes de contratarlos.',
       'Vetting destination suppliers (ground handlers, transfers) before contracting them.',
     ),
-    segurcaixa: l(
+    insurance: l(
       'Control de proveedores (talleres, peritos, clínicas) y de terceros implicados en siniestros.',
       'Checks on suppliers (repair shops, adjusters, clinics) and third parties involved in claims.',
     ),

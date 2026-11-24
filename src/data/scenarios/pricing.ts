@@ -13,7 +13,7 @@ export const pricing: Scenario = {
   id: 'competitor-pricing',
   num: 2,
   icon: 'Tags',
-  primaryClient: 'iberdrola',
+  primaryClient: 'energy',
   sector: l('Energía · Pricing', 'Energy · Pricing'),
   title: l('Precios de la competencia, hoy', 'Competitor pricing, today'),
   tagline: l(
@@ -29,23 +29,23 @@ export const pricing: Scenario = {
     'Know what competitors charge today, with the exact time each price was read.',
   ),
   clientFit: {
-    iberdrola: l(
+    energy: l(
       'Tarifas de luz y gas de las comercializadoras rivales, leídas cada mañana en su web.',
       'Rival retailers’ power and gas tariffs, read from their websites every morning.',
     ),
-    barcelo: l(
+    hospitality: l(
       'Ofertas y condiciones publicadas por hoteles competidores en su propia web, por destino.',
       'Offers and terms published by competing hotels on their own websites, by destination.',
     ),
-    w2m: l(
+    travel: l(
       'Precios y condiciones de paquetes de la competencia, con la hora exacta de lectura.',
       'Competitors’ package prices and terms, with the exact time they were read.',
     ),
-    segurcaixa: l(
+    insurance: l(
       'Primas de referencia, coberturas y promociones publicadas por otras aseguradoras.',
       'Reference premiums, coverage and promotions published by other insurers.',
     ),
-    cam: l(
+    'public-sector': l(
       'Precios públicos de referencia para estudios de mercado y para fijar el presupuesto de licitaciones.',
       'Public reference prices for market studies and for setting tender budgets.',
     ),

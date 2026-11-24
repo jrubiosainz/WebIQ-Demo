@@ -11,7 +11,7 @@ const isPage = (v: unknown): v is PageKind => PAGES.includes(v as PageKind);
 
 /**
  * Enlace profundo ya validado. Ejemplo:
- * ?scenario=2&variant=bing&tab=cost&t=end&lang=en&client=barcelo&theme=dark&view=why&settings=open
+ * ?scenario=2&variant=bing&tab=cost&t=end&lang=en&client=hospitality&theme=dark&view=why&settings=open
  * El caso 0 (consulta en vivo) se abre con ?scenario=0 o ?view=live.
  * Lo que no se reconoce se ignora (null) y la demo arranca con lo guardado.
  */

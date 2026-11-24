@@ -6,7 +6,7 @@
 
 > “Web IQ is more than search for a chatbot. It combines web, news, video and image search, page reading, and structured answers. We’ll look at six business tasks that often take several queries, tools, or custom integration code today.”
 
-Select the client profile that best fits the audience. In **Settings**, switch language, apply a palette, edit colours, or upload an authorised logo. Keep neutral branding if you do not have permission to use a customer’s visual identity.
+Select a generic sector profile that fits the audience, or leave **Neutral** selected. In **Settings**, switch language, apply a palette, or edit colours. No customer names or logos are bundled; any authorized branding you add is for your own presentation and must not enter the public sample.
 
 ## Case 0 · Live (optional, 2–3 minutes)
 

@@ -1,6 +1,8 @@
 # Microsoft Web IQ Demo
 
-An interactive demo showcasing six business tasks that combine vertical search, recent evidence, and direct page reading. Each scenario replays a scripted run with fictional data and lets you compare the Web IQ workflow with a Grounding with Bing Search alternative. **Case 0 · Live** lets you enter any question and watch real Web IQ calls and a cited answer in real time. **Case 6** runs a real Microsoft Foundry agent that reviews synthetic telecom contracts with Foundry IQ and supplements them with a live reputational review using Web IQ. The demo includes a Spanish/English interface, client profiles, themes, and customizable branding.
+An interactive demo showcasing six business tasks that combine vertical search, recent evidence, and direct page reading. Each scenario replays a scripted run with fictional data and lets you compare the Web IQ workflow with a Grounding with Bing Search alternative. **Case 0 · Live** lets you enter any question and watch real Web IQ calls and a cited answer in real time. **Case 6** runs a real Microsoft Foundry agent that reviews synthetic telecom contracts with Foundry IQ and supplements them with a live reputational review using Web IQ. The demo includes a Spanish/English interface, generic sector profiles, themes, and optional local branding. It is intended for developers exploring Web IQ integrations and presenters explaining the workflows, not for production procurement or compliance decisions.
+
+**Customer-neutral by default:** no customer names, logos, initials, or brand palettes are bundled. Sector profiles are generic. Real telecom providers in Case 6 are subjects of public-source research, not identified as customers or partners; all example contracts are synthetic.
 
 The original code is distributed under the MIT license. Notices for dependencies, sources, trademarks, and third-party content are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
@@ -20,8 +22,10 @@ The demo does not claim that Grounding with Bing Search cannot support these wor
 
 ## Requirements and running the demo
 
-- Node.js 22 or later.
+- Node.js 22.12 or later (22 LTS or a newer supported LTS release).
 - No key is required to explore the scripted scenarios.
+- Live search requires Web IQ access and authorization for the selected endpoints; see the [public Web IQ documentation](https://learn.microsoft.com/en-us/web-iq/).
+- Generated answers require an OpenAI v1-compatible model deployment. Foundry agent mode additionally requires a Foundry project and Azure AI Search knowledge base. Azure CLI authentication is needed for local Entra access and provisioning; see [sign in with Azure CLI](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli-interactively).
 
 ```bash
 npm ci
@@ -174,9 +178,9 @@ The template enables the managed identity, proxy limits, and `TRUST_PROXY`. The 
 ## Language and customization
 
 - Switch between **ES** and **EN** in the header; the selection is saved in the browser.
-- Under **Settings → Client**, select Iberdrola, Barceló, W2M, SegurCaixa Adeslas, the Community of Madrid, or another client. You can automatically apply approximate brand colors, hide other clients, and highlight recommended scenarios.
+- Under **Settings → Profile**, choose Energy, Hospitality, Travel, Insurance, Public sector, or Custom. You can apply a generic palette, hide other profiles, and highlight recommended scenarios. The default is **Neutral (no profile)**.
 - Under **Settings → Appearance**, choose one of four themes or customize the background, panel, header, and accent colors. You can also change fonts, sizing, and corner radii.
-- Under **Settings → Logos**, upload an SVG, PNG, or WebP file; it is stored only in the browser's local storage. To include a logo when serving the demo, see [`public/logos/README.md`](public/logos/README.md). Use brands and logos only with authorization.
+- Under **Settings → Logos**, optionally upload an authorized SVG, PNG, or WebP file for your own presentation; it is stored only in the browser's local storage. No organization logos are shipped. Local logo files are excluded from Git; see [`public/logos/README.md`](public/logos/README.md). Do not publish private branding or exported settings.
 - Most options are saved in the browser's `localStorage`. They are not sent to the server.
 
 ## Deep links and walkthroughs
@@ -185,7 +189,7 @@ The demo supports deep links to prepare a presentation, for example:
 
 ```text
 ?scenario=3&variant=bing&lang=en
-?scenario=regulatory-watch&t=end&client=barcelo&theme=dark
+?scenario=regulatory-watch&t=end&client=hospitality&theme=dark
 ?view=why
 ?view=guide&settings=open
 ?scenario=0&lang=en
@@ -193,6 +197,8 @@ The demo supports deep links to prepare a presentation, for example:
 ```
 
 `scenario` accepts a case number (0–6) or its identifier (`0` or `view=live` opens Case 0); `variant` can be `webiq` or `bing`; `t=end` jumps to the result; `tab` opens a lower-panel tab (for example, `foundry`). Unknown parameters are ignored.
+
+`client` selects a generic profile: `energy`, `hospitality`, `travel`, `insurance`, `public-sector`, `custom`, or `none`. Old organization-specific profile IDs are no longer recognized; names and logos stored under those IDs are discarded when settings are loaded. Your own custom overrides remain local. Use **Settings → Demo → Reset** or clear this site's storage for a fresh, neutral presentation.
 
 ## Data, API, and pricing
 
@@ -202,6 +208,29 @@ The demo supports deep links to prepare a presentation, for example:
 - Offers, contracts, amounts, and incidents in Case 6 are **synthetic** (Logística Meridiana is fictional) and do not reflect real offers from Movistar, Vodafone, or Orange. The reputational review in the **Foundry agent** tab uses real news and web pages; responses vary between runs and are not purchasing advice.
 - The cost table is only a simulation using reference prices retrieved on **October 28, 2026**. The comparison method and volumes are editable assumptions, not a quote. Check current prices, availability, and terms before deploying or making a proposal.
 - Microsoft, Web IQ, Foundry, Grounding with Bing Search, and the mentioned provider names are trademarks or services of their respective owners. The demo is not sponsored or endorsed by those providers, does not imply a commercial relationship, and does not recommend any real product.
+
+## Telemetry and data handling
+
+The sample adds no analytics SDK or telemetry collector and sends no telemetry
+to repository maintainers; there is no sample telemetry to opt out of. Scripted
+playback does not call Web IQ or a model. Live mode sends prompts, search queries,
+and retrieved evidence to your configured Web IQ and model/Foundry services.
+Use synthetic or public inputs only. Service-side data handling is separate:
+see the [Web IQ privacy guidance](https://learn.microsoft.com/en-us/web-iq/resources/faq#privacy-and-data-handling)
+and the terms for your configured model and Azure services.
+
+The server does not persist live results. It writes request counts, timing,
+startup configuration (including resource hostnames), and error diagnostics to
+stdout/stderr. Foundry error messages can include upstream details. The optional
+`foundry/run-agent.mjs` CLI prints queries, tool arguments, and the answer;
+`--raw` prints additional event data. Do not share raw logs or capture them in
+public artifacts. Hosting-platform log collection and retention are controlled
+by the operator, not this sample.
+
+UI preferences, user-supplied branding, and the live access code are stored in
+browser `localStorage`. Clear site storage to remove
+them. Do not distribute exported settings containing private branding. Opening
+source links or displaying live media contacts those third-party sites.
 
 ## Development and checks
 

@@ -1,17 +1,21 @@
-# Logos de clientes
+# Optional local branding
 
-Coloca aquí los logos para que la demo los cargue automáticamente (sin tener que
-subirlos en Ajustes). Nombres de fichero admitidos (svg, png, webp o jpg):
+No customer or organization logos are included. The built-in profiles are generic
+sectors, with neutral palettes and text monograms, not customer identities.
 
-| Cliente | Fichero |
+For a private presentation, you may add an authorized logo here. These files are
+ignored by Git. Supported extensions: `svg`, `png`, `webp`, `jpg`, and `jpeg`.
+
+| Sector profile | Example filename |
 |---|---|
-| Iberdrola | `iberdrola.svg` / `iberdrola.png` |
-| Barceló | `barcelo.svg` / `barcelo.png` |
-| W2M | `w2m.svg` / `w2m.png` |
-| SegurCaixa Adeslas | `segurcaixa.svg` / `segurcaixa.png` |
-| Comunidad de Madrid | `cam.svg` / `cam.png` |
-| Otro cliente | `custom.svg` / `custom.png` |
+| Energy | `energy.svg` |
+| Hospitality | `hospitality.svg` |
+| Travel | `travel.svg` |
+| Insurance | `insurance.svg` |
+| Public sector | `public-sector.svg` |
+| Custom | `custom.svg` |
 
-Los logos subidos desde **Ajustes → Logos** tienen prioridad y se guardan solo
-en el navegador (localStorage). Usa logos oficiales con permiso del cliente; no
-se incluyen en el repositorio.
+Logos uploaded through **Settings → Logos** take priority and remain in the
+browser's `localStorage`. Use only images you are authorized to use. Do not
+include customer names, logos, exported settings, or private branding in public
+contributions, screenshots, or deployment artifacts.

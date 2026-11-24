@@ -113,7 +113,7 @@ export function GuideView() {
     ['tab', 'evidence · compare · cost · api · live', es ? 'Pestaña inicial del panel inferior' : 'Initial tab of the bottom panel'],
     ['t', es ? 'ms o end' : 'ms or end', es ? 'Empieza en ese momento (end = resultado final)' : 'Starts at that moment (end = final result)'],
     ['lang', 'es · en', es ? 'Idioma' : 'Language'],
-    ['client', 'iberdrola · barcelo · w2m · segurcaixa · cam · custom · none', es ? 'Cliente activo (logo, colores y recomendación)' : 'Active client (logo, colours and recommendation)'],
+    ['client', 'energy · hospitality · travel · insurance · public-sector · custom · none', es ? 'Perfil sectorial (colores y recomendación)' : 'Sector profile (colours and recommendation)'],
     ['theme', 'light · soft · dark', es ? 'Tema base' : 'Base theme'],
     ['view', 'live · why · guide', es ? 'Abre el Caso 0, «Por qué Web IQ» o esta guía' : 'Opens Case 0, “Why Web IQ” or this guide'],
     ['settings', 'open', es ? 'Abre los ajustes' : 'Opens settings'],
@@ -164,9 +164,9 @@ export function GuideView() {
         <h2 id="guide-present">{es ? 'Presentar la demo' : 'Presenting the demo'}</h2>
         <p>
           {es
-            ? 'Prepara cada cliente en Ajustes (logo, colores, tipografía y nombre) y comparte enlaces que abren el caso exacto. Ejemplo:'
-            : 'Set up each client in Settings (logo, colours, font and name) and share links that open the exact case. Example:'}{' '}
-          <code>?scenario=2&amp;variant=bing&amp;tab=cost&amp;lang=en&amp;client=barcelo</code>
+            ? 'Selecciona un perfil sectorial en Ajustes y comparte enlaces que abren el caso exacto. Los perfiles incluidos son genéricos y no representan a clientes. Ejemplo:'
+            : 'Select a sector profile in Settings and share links that open the exact case. Included profiles are generic and do not represent customers. Example:'}{' '}
+          <code>?scenario=2&amp;variant=bing&amp;tab=cost&amp;lang=en&amp;client=hospitality</code>
         </p>
         <div className="table-scroll">
           <table className="data">

@@ -47,7 +47,7 @@ export const contracts: Scenario = {
   id: 'supplier-contracts',
   num: 6,
   icon: 'Handshake',
-  primaryClient: 'iberdrola',
+  primaryClient: 'energy',
   sector: l('Compras · Proveedores TIC', 'Procurement · ICT suppliers'),
   title: l('Contratos de proveedores con Foundry IQ y Web IQ', 'Supplier contracts with Foundry IQ and Web IQ'),
   tagline: l(
@@ -63,23 +63,23 @@ export const contracts: Scenario = {
     'Choose a supplier based on what its contract says and on what is being said about it today.',
   ),
   clientFit: {
-    iberdrola: l(
+    energy: l(
       'Homologación y renovación de proveedores críticos: contratos internos más reputación, sanciones y noticias recientes.',
       'Qualifying and renewing critical suppliers: internal contracts plus reputation, sanctions and recent news.',
     ),
-    barcelo: l(
+    hospitality: l(
       'Conectividad de cada hotel: elegir operador por precio, SLA y lo que dicen hoy sus clientes.',
       'Connectivity for every hotel: choosing an operator on price, SLA and what its customers say today.',
     ),
-    w2m: l(
+    travel: l(
       'Contratos de comunicaciones del contact center y de las oficinas en varios países.',
       'Communications contracts for the contact centre and offices across several countries.',
     ),
-    segurcaixa: l(
+    insurance: l(
       'Telefonía del contact center de siniestros y de la red de oficinas: precio estable y SLA exigible.',
       'Telephony for the claims contact centre and the branch network: stable prices and an enforceable SLA.',
     ),
-    cam: l(
+    'public-sector': l(
       'Renovación de servicios de telecomunicaciones: contrastar las ofertas con datos públicos, fechados y verificables.',
       'Renewing telecom services: checking offers against public, dated and verifiable data.',
     ),
@@ -88,7 +88,7 @@ export const contracts: Scenario = {
   dataNote: l('Contratos sintéticos · noticias reales (5-nov-2026)', 'Synthetic contracts · real news (5 Nov 2026)'),
   foundry: {
     name: 'revisor-contratos-telco',
-    project: 'projfoundryiq',
+    project: '<your-foundry-project>',
     model: 'gpt-5.4-mini',
     knowledgeBase: 'kb-contratos-telco',
     tools: ['foundry_iq_contratos', 'web_iq'],
